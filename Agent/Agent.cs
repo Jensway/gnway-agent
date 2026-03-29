@@ -10,6 +10,9 @@ using System.Collections.Generic;
 using System.IO;
 using System.IO.Pipes;
 using System.Linq;
+using System.Net;
+using System.Net.NetworkInformation;
+using System.Net.Sockets;
 using System.Text;
 using System.Threading;
 using System.Windows.Automation;
@@ -26,6 +29,8 @@ namespace GnwayAgent
             Console.WriteLine("=== GnwayAgent 服务端 ===");
             Console.WriteLine($"进程ID: {System.Diagnostics.Process.GetCurrentProcess().Id}");
             Console.WriteLine($"管道名称: {PIPE_NAME}");
+            Console.WriteLine($"主机名称: {Dns.GetHostName()}");
+            PrintLocalIPs();
             Console.WriteLine("等待指令中... (Ctrl+C 退出)\n");
 
             // 循环监听，每次处理完一个客户端连接后继续等待下一个
@@ -355,6 +360,28 @@ namespace GnwayAgent
         // =====================================================
         //  工具函数
         // =====================================================
+
+        // 打印本机所有 IPv4 地址
+        static void PrintLocalIPs()
+        {
+            Console.WriteLine("本机 IP 地址（Controller 连接时使用）:");
+            bool found = false;
+            foreach (NetworkInterface nic in NetworkInterface.GetAllNetworkInterfaces())
+            {
+                if (nic.OperationalStatus != OperationalStatus.Up) continue;
+                if (nic.NetworkInterfaceType == NetworkInterfaceType.Loopback) continue;
+
+                foreach (UnicastIPAddressInformation addr in
+                    nic.GetIPProperties().UnicastAddresses)
+                {
+                    if (addr.Address.AddressFamily != AddressFamily.InterNetwork) continue;
+                    Console.WriteLine($"  [{nic.Name}] {addr.Address}");
+                    found = true;
+                }
+            }
+            if (!found)
+                Console.WriteLine("  （未检测到局域网网卡，请确认网络连接）");
+        }
 
         // 查找顶层窗口（模糊匹配标题）
         static AutomationElement? FindWindow(string titlePattern)
