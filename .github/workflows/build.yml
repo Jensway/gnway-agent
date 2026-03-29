@@ -9,31 +9,28 @@ on:
 
 jobs:
   build:
-    runs-on: windows-latest   # 必须用 Windows runner 才能编译 UIAutomation
+    # windows-latest 已内置 .NET SDK + .NET Framework 4.8 + MSBuild
+    # 无需 setup-dotnet，直接编译即可
+    runs-on: windows-latest
 
     steps:
     - name: Checkout
       uses: actions/checkout@v4
-
-    - name: Setup .NET
-      uses: actions/setup-dotnet@v4
-      with:
-        dotnet-version: '4.8.x'   # .NET Framework 4.8，服务器自带无需安装
 
     # 编译服务端 Agent
     - name: Build Agent (Server)
       run: |
         cd Agent
         dotnet build -c Release
-      
-    # 编译客户端 Controller  
+
+    # 编译客户端 Controller
     - name: Build Controller (Client)
       run: |
         cd Controller
         dotnet build -c Release
 
     # 上传编译结果，可直接在 Actions 页面下载
-    - name: Upload Agent EXE
+    - name: Upload Artifacts
       uses: actions/upload-artifact@v4
       with:
         name: GnwayAgent-Release
