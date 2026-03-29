@@ -29,6 +29,12 @@ jobs:
         cd Controller
         dotnet build -c Release
 
+    # 编译发票自动化 InvoiceRunner
+    - name: Build InvoiceRunner
+      run: |
+        cd InvoiceRunner
+        dotnet build -c Release
+
     # 上传编译结果，可直接在 Actions 页面下载
     - name: Upload Artifacts
       uses: actions/upload-artifact@v4
@@ -37,4 +43,5 @@ jobs:
         path: |
           Agent/bin/Release/net48/agent.exe
           Controller/bin/Release/net48/controller.exe
+          InvoiceRunner/bin/Release/net48/invoice-runner.exe
         retention-days: 30
