@@ -598,48 +598,46 @@ namespace GnwayAgent
             mouse_event(MOUSEEVENTF_LEFTUP, pt.X, pt.Y, 0, 0);
         }
 
-        // ── listcontrols|窗口名[|深度] ────────────────────────
-        // 返回: OK:Type|Name|Enabled(1/0) 每行一个控件
+        // ── listcontrols|窗口名[|深度(已弃用)] ────────────────────────
+        // 返回: OK:\nType|Name|Enabled(1/0) 每行一个控件
         static string DoListControls(AutomationElement window, string[] parts)
         {
-            int depth = parts.Length > 2 && int.TryParse(parts[2], out int d) ? d : 4;
-            var sb = new System.Text.StringBuilder("OK:");
-            CollectControls(window, 0, depth, sb);
+            // 使用 FindAll(Descendants) 一次性获取所有 ControlView 元素，性能比递归 TreeWalker 高很多
+            var sb = new System.Text.StringBuilder("OK:\n");
+
+            try
+            {
+                var elements = window.FindAll(TreeScope.Descendants, Automation.ControlViewCondition);
+                if (elements != null)
+                {
+                    foreach (AutomationElement el in elements)
+                    {
+                        try
+                        {
+                            string type    = el.Current.ControlType.ProgrammaticName
+                                               .Replace("ControlType.", "");
+                            string name    = el.Current.Name ?? "";
+                            bool   enabled = el.Current.IsEnabled;
+                            
+                            // 过滤掉空名且为纯容器的控件（减少噪音）
+                            bool isContainer = (type == "Pane" || type == "Document" || type == "Group" || type == "Window")
+                                               && string.IsNullOrEmpty(name);
+                                               
+                            if (!isContainer && type != "ScrollBar")
+                            {
+                                sb.AppendLine($"{type}|{name}|{(enabled ? "1" : "0")}");
+                            }
+                        }
+                        catch { /* 忽略已失效元素 */ }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                return $"ERR:获取控件树失败: {ex.Message}";
+            }
+
             return sb.ToString().TrimEnd();
-        }
-
-        static void CollectControls(AutomationElement el, int depth, int maxDepth,
-                                    System.Text.StringBuilder sb)
-        {
-            try
-            {
-                if (depth > 0)  // depth 0 是窗口本身，跳过
-                {
-                    string type    = el.Current.ControlType.ProgrammaticName
-                                       .Replace("ControlType.", "");
-                    string name    = el.Current.Name ?? "";
-                    bool   enabled = el.Current.IsEnabled;
-                    // 过滤掉空名且为纯容器的控件（减少噪音）
-                    bool isContainer = (type == "Pane" || type == "Document" || type == "Group")
-                                       && string.IsNullOrEmpty(name);
-                    if (!isContainer && type != "ScrollBar")
-                        sb.AppendLine($"{type}|{name}|{(enabled ? "1" : "0")}");
-                }
-                if (depth >= maxDepth) return;
-            }
-            catch { return; } // Skip controls that throw ElementNotAvailableException
-
-            try
-            {
-                var walker = TreeWalker.ControlViewWalker;
-                var child  = walker.GetFirstChild(el);
-                while (child != null)
-                {
-                    CollectControls(child, depth + 1, maxDepth, sb);
-                    child = walker.GetNextSibling(child);
-                }
-            }
-            catch { }
         }
 
         // ── gridrows|窗口名|控件名[|最大行数] ─────────────────
