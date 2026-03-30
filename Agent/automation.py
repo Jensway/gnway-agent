@@ -8,14 +8,18 @@ def get_window(title_pattern, timeout=0):
     start = time.time()
     while True:
         try:
-            # 使用 contains (正则匹配) 搜索可见窗口
-            # 优先使用 UIA 后端寻找窗口以支持现代 UI，但在控件遍历时我们可以混用底层 win32 API
-            elements = find_elements(title_re=f".*{title_pattern}.*", visible_only=True, backend="uia")
-            if elements:
-                # 获取第一个匹配窗口的句柄，并包装为 pywinauto 的 window 对象
-                hwnd = elements[0].handle
-                app = pywinauto.Application(backend="uia").connect(handle=hwnd)
-                return app.window(handle=hwnd)
+            # 放弃难以调试的内部正则 search，使用最朴素稳定的 substring 判断，完全 1:1 还原 C#
+            desktop = Desktop(backend="uia")
+            for w in desktop.windows(visible_only=False):
+                # 获取该窗口的名称
+                name = w.element_info.name or ""
+                if title_pattern in name:
+                    # 匹配成功！由于我们在使用 UIA，部分弹窗可能是 IsOffscreen 但肉眼可见的
+                    w_wrap = w.wrapper_object()
+                    if not w_wrap.is_offscreen:
+                        hwnd = w.element_info.handle
+                        app = pywinauto.Application(backend="uia").connect(handle=hwnd)
+                        return app.window(handle=hwnd)
         except Exception:
             pass
             
@@ -50,7 +54,9 @@ def find_control(window_wrapper, control_name, control_type=None, parent_name=No
             # 放大搜索范围尝试纯名称包含
             kwargs.pop("auto_id", None)
             kwargs.pop("title", None)
-            kwargs["title_re"] = f".*{control_name}.*"
+            import re
+            safe_ctrl_name = re.escape(control_name)
+            kwargs["title_re"] = f".*{safe_ctrl_name}.*"
             ctrls = root.descendants(**kwargs)
             
         if ctrls and len(ctrls) > index:
