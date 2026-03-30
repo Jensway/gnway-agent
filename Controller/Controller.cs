@@ -35,7 +35,7 @@ namespace GnwayController
             {
                 string winList   = args.Length >= 3 ? args[2] : "发票管理";
                 string winDetail = args.Length >= 4 ? args[3] : "发票详情";
-                InvoiceRunner.Run(_server, winList, winDetail, Send);
+                InvoiceRunner.Run(_server, winList, winDetail, s => Send(s));
                 return;
             }
 
@@ -58,7 +58,7 @@ namespace GnwayController
                 Console.Write($"\n[{_server}] > ");
                 Console.ResetColor();
 
-                string? line = Console.ReadLine()?.Trim();
+                string line = Console.ReadLine()?.Trim() ?? string.Empty;
                 if (string.IsNullOrEmpty(line)) continue;
 
                 if (line == "exit" || line == "quit") break;
@@ -83,7 +83,7 @@ namespace GnwayController
                     var parts = line.Split(' ');
                     string winList   = parts.Length >= 2 ? parts[1] : "发票管理";
                     string winDetail = parts.Length >= 3 ? parts[2] : "发票详情";
-                    InvoiceRunner.Run(_server, winList, winDetail, Send);
+                    InvoiceRunner.Run(_server, winList, winDetail, s => Send(s));
                     continue;
                 }
 
