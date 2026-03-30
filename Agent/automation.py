@@ -366,11 +366,19 @@ def do_listcontrols_stream(window, pipe):
         return bool(name and name.strip()) # Containers with names
         
     try:
-        # 使用底层 win32 枚举极大加速。直接使用 EnumChildWindows 平铺句柄
+        import win32gui
+        hwnds = []
+        
+        # 使用底层 win32 枚举平铺句柄。绝对不要在回调中做耗时的 COM (UIA) 调用以免引起死锁
         def callback(hwnd, extra):
+            hwnds.append(hwnd)
+            return True
+            
+        win32gui.EnumChildWindows(window.handle, callback, None)
+        
+        from pywinauto.uia_element_info import UIAElementInfo
+        for hwnd in hwnds:
             try:
-                # 修正：正确的 pywinauto 导入路径
-                from pywinauto.uia_element_info import UIAElementInfo
                 w = UIAElementInfo(hwnd)
                 ct = w.control_type or "Custom"
                 name = w.name or ""
@@ -378,11 +386,6 @@ def do_listcontrols_stream(window, pipe):
                 if is_key_control(ct, name):
                     write_pipe_stream(pipe, f"{ct}|{name}|{enabled}")
             except Exception:
-                # 若提取单独 hwnd 时异常，忽略它，不拖累整个流
                 pass
-            return True
-            
-        import win32gui
-        win32gui.EnumChildWindows(window.handle, callback, None)
     except Exception as e:
         write_pipe_stream(pipe, f"ERR:获取控件树异常: {str(e)}")
