@@ -879,6 +879,14 @@ namespace GnwayAgent
                         
                     if (!visible)
                         display += " {隐}";
+                        
+                    try 
+                    {
+                        var rect = child.Current.BoundingRectangle;
+                        if (!rect.IsEmpty && visible)
+                            display += $" [位置:{(int)rect.X},{(int)rect.Y} 宽:{(int)rect.Width}]";
+                    } 
+                    catch { }
 
                     string pad = new string('-', depth * 2) + " ";
                     writer.WriteLine($"{type}|{pad}{display}|{(enabled ? "1" : "0")}");
