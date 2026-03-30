@@ -31,52 +31,79 @@ namespace GnwayAgent
             Console.WriteLine($"管道名称: {PIPE_NAME}");
             Console.WriteLine($"主机名称: {Dns.GetHostName()}");
             PrintLocalIPs();
-            Console.WriteLine("等待指令中... (Ctrl+C 退出)\n");
+            Console.WriteLine("等待指令中... 您也可以直接在此处输入命令（如 windows 或 listcontrols|处理）按回车本地调试！\n");
 
-            // 循环监听，每次处理完一个客户端连接后继续等待下一个
+            // 将网络管道监听放入独立后台线程，防止阻塞本地控制台输入
+            var pipeThread = new Thread(() =>
+            {
+                while (true)
+                {
+                    try
+                    {
+                        using var server = new NamedPipeServerStream(
+                            PIPE_NAME,
+                            PipeDirection.InOut,
+                            1,                          // 同时只处理1个连接
+                            PipeTransmissionMode.Message,
+                            PipeOptions.None
+                        );
+
+                        // 不要频繁打印等待连接，因为本地控制台需要清净
+                        server.WaitForConnection();
+                        Console.WriteLine("\n[连接] 客户端已连接");
+
+                        var reader = new StreamReader(server, Encoding.UTF8);
+                        var writer = new StreamWriter(server, Encoding.UTF8) { AutoFlush = true };
+
+                        string? cmdLine = reader.ReadLine();
+                        if (string.IsNullOrEmpty(cmdLine))
+                        {
+                            writer.WriteLine("ERR:空命令");
+                            continue;
+                        }
+
+                        Console.WriteLine($"[收到] {cmdLine}");
+                        string? result = ProcessCommand(cmdLine, writer);
+                        if (result != null)
+                        {
+                            writer.WriteLine(result);
+                            Console.WriteLine($"[网络返回] {result}");
+                        }
+                        else
+                        {
+                            Console.WriteLine($"[网络返回] <流式输出完毕>");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"[网络管道错误] {ex.Message}");
+                        Thread.Sleep(500);
+                    }
+                }
+            });
+            pipeThread.IsBackground = true;
+            pipeThread.Start();
+
+            // 主线程：本地控制台调试入口
             while (true)
             {
+                string? input = Console.ReadLine();
+                if (string.IsNullOrWhiteSpace(input)) continue;
+
+                Console.WriteLine($"\n--- [本地调试] 开始执行 {input} ---");
                 try
                 {
-                    using var server = new NamedPipeServerStream(
-                        PIPE_NAME,
-                        PipeDirection.InOut,
-                        1,                          // 同时只处理1个连接
-                        PipeTransmissionMode.Message,
-                        PipeOptions.None
-                    );
-
-                    Console.WriteLine("[等待] 客户端连接中...");
-                    server.WaitForConnection();
-                    Console.WriteLine("[连接] 客户端已连接");
-
-                    var reader = new StreamReader(server, Encoding.UTF8);
-                    var writer = new StreamWriter(server, Encoding.UTF8) { AutoFlush = true };
-
-                    string? cmdLine = reader.ReadLine();
-                    if (string.IsNullOrEmpty(cmdLine))
-                    {
-                        writer.WriteLine("ERR:空命令");
-                        continue;
-                    }
-
-                    Console.WriteLine($"[收到] {cmdLine}");
-                    string? result = ProcessCommand(cmdLine, writer);
+                    string? result = ProcessCommand(input, Console.Out);
                     if (result != null)
                     {
-                        writer.WriteLine(result);
-                        Console.WriteLine($"[返回] {result}\n");
-                    }
-                    else
-                    {
-                        Console.WriteLine($"[返回] <流式输出已处理>\n");
+                        Console.WriteLine(result);
                     }
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"[错误] {ex.Message}");
-                    Thread.Sleep(1000);
+                    Console.WriteLine($"[本地错误] {ex.Message}");
                 }
+                Console.WriteLine("------------------------------------\n");
             }
         }
 
@@ -90,7 +117,7 @@ namespace GnwayAgent
         //        tree|ERP系统
         //        windows      (列出所有窗口)
         // =====================================================
-        static string? ProcessCommand(string cmdLine, StreamWriter writer)
+        static string? ProcessCommand(string cmdLine, TextWriter writer)
         {
             string[] parts = cmdLine.Split('|');
             string action = parts[0].ToLower().Trim();
@@ -714,7 +741,7 @@ namespace GnwayAgent
         [return: System.Runtime.InteropServices.MarshalAs(System.Runtime.InteropServices.UnmanagedType.Bool)]
         static extern bool IsWindowEnabled(IntPtr hWnd);
 
-        static void DoListControlsStream(AutomationElement window, string[] parts, StreamWriter writer)
+        static void DoListControlsStream(AutomationElement window, string[] parts, TextWriter writer)
         {
             writer.WriteLine("OK:"); // 流式标识首行
             try
