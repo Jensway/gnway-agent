@@ -30,9 +30,6 @@ namespace GnwayAgent
             Console.WriteLine($"进程ID: {System.Diagnostics.Process.GetCurrentProcess().Id}");
             Console.WriteLine($"管道名称: {PIPE_NAME}");
             Console.WriteLine($"主机名称: {Dns.GetHostName()}");
-            PrintLocalIPs();
-            Console.WriteLine("等待指令中... 您也可以直接在此处输入命令（如 windows 或 listcontrols|处理）按回车本地调试！\n");
-
             // 将网络管道监听放入独立后台线程，防止阻塞本地控制台输入
             var pipeThread = new Thread(() =>
             {
@@ -48,9 +45,9 @@ namespace GnwayAgent
                             PipeOptions.None
                         );
 
-                        // 不要频繁打印等待连接，因为本地控制台需要清净
+                        // 不再打印阻塞提示，保证本地控制台干净
                         server.WaitForConnection();
-                        Console.WriteLine("\n[连接] 客户端已连接");
+                        Console.WriteLine("\n[网络连接] Controller 客服端已从外部接入管道！");
 
                         var reader = new StreamReader(server, Encoding.UTF8);
                         var writer = new StreamWriter(server, Encoding.UTF8) { AutoFlush = true };
@@ -62,7 +59,7 @@ namespace GnwayAgent
                             continue;
                         }
 
-                        Console.WriteLine($"[收到] {cmdLine}");
+                        Console.WriteLine($"[收到网络指令] {cmdLine}");
                         string? result = ProcessCommand(cmdLine, writer);
                         if (result != null)
                         {
@@ -84,13 +81,41 @@ namespace GnwayAgent
             pipeThread.IsBackground = true;
             pipeThread.Start();
 
+            // 首次启动时打印懒人交互菜单
+            PrintMenu();
+
             // 主线程：本地控制台调试入口
             while (true)
             {
                 string? input = Console.ReadLine();
                 if (string.IsNullOrWhiteSpace(input)) continue;
 
-                Console.WriteLine($"\n--- [本地调试] 开始执行 {input} ---");
+                if (input.Trim().ToLower() == "m" || input.Trim().ToLower() == "menu")
+                {
+                    PrintMenu();
+                    continue;
+                }
+
+                // 如果用户直接输入了一个纯数字，我们认为是窗口编号选择
+                if (int.TryParse(input.Trim(), out int menuIndex))
+                {
+                    var windows = GetValidWindows();
+                    if (menuIndex >= 1 && menuIndex <= windows.Count)
+                    {
+                        string target = windows[menuIndex - 1];
+                        Console.WriteLine($"\n========== [拉取全部控件树] {target} ==========");
+                        ProcessCommand($"listcontrols|{target}", Console.Out);
+                        Console.WriteLine("====================================================\n输入 'm' 刷新窗口列表，或直接继续输入你要测的其他动作。");
+                    }
+                    else
+                    {
+                        Console.WriteLine(">>> 编号无效，请对照上方列表重新输入，或按 'm' 重新唤出列表。");
+                    }
+                    continue;
+                }
+
+                // 其他手敲的原始指令
+                Console.WriteLine($"\n--- [本地手动调试] 开始执行 {input} ---");
                 try
                 {
                     string? result = ProcessCommand(input, Console.Out);
@@ -105,6 +130,37 @@ namespace GnwayAgent
                 }
                 Console.WriteLine("------------------------------------\n");
             }
+        }
+
+        static System.Collections.Generic.List<string> GetValidWindows()
+        {
+            var all = AutomationElement.RootElement.FindAll(TreeScope.Children, Condition.TrueCondition);
+            var list = new System.Collections.Generic.List<string>();
+            foreach (AutomationElement e in all)
+            {
+                if (!string.IsNullOrEmpty(e.Current.Name))
+                {
+                    list.Add(e.Current.Name);
+                }
+            }
+            return list;
+        }
+
+        static void PrintMenu()
+        {
+            PrintLocalIPs();
+            Console.WriteLine("\n==== [Agent 本地懒人调试菜单] ====");
+            var list = GetValidWindows();
+            for (int i = 0; i < list.Count; i++)
+            {
+                Console.WriteLine($" [{i + 1}] {list[i]}");
+            }
+            Console.WriteLine("==================================");
+            Console.WriteLine("请直接输入上方窗口前对应的【数字】（如 1 或 2）并按回车。");
+            Console.WriteLine("Agent 将直接打印该窗口的所有底层 Win32 控件结构。");
+            Console.WriteLine("若窗口未显示，请按 'm' 键刷新列表。");
+            Console.WriteLine("网络客户端 NamedPipe 也仍在后台静默监听，随时可连接。");
+            Console.Write("\n请输入数字或指令: ");
         }
 
         // =====================================================
