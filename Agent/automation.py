@@ -108,9 +108,12 @@ def process_command(cmd_line, pipe=None):
         if action == "windowexists":
             return "OK:true" if get_window(app_title) else "OK:false"
             
-        win = get_window(app_title)
-        if not win:
+        win_spec = get_window(app_title)
+        if not win_spec:
             raise Exception(f"找不到窗口: {app_title}")
+            
+        # 必须将预搜索的 Specification 提前脱壳为 wrapper 实体，否则后续的 .handle 和 .element_info 均会抛出 AttributeError！
+        win = win_spec.wrapper_object()
 
         if action == "listcontrols":
             do_listcontrols_stream(win, pipe)
@@ -153,10 +156,16 @@ def dump_tree(window, depth):
     old_stdout = sys.stdout
     sys.stdout = my_stdout = io.StringIO()
     try:
-        window.print_control_identifiers(depth=depth)
+        # 这里的 window 从 process_command 传进来可能已经是 wrapper，需要特殊处理
+        if hasattr(window, "print_control_identifiers"):
+            window.print_control_identifiers(depth=depth)
     finally:
         sys.stdout = old_stdout
-    return f"OK:控件树 [{window.element_info.name}]\n" + my_stdout.getvalue().strip()
+    
+    # 兼容 WindowSpecification 与 Wrapper
+    info = getattr(window, "element_info", None)
+    name_str = info.name if info else ""
+    return f"OK:控件树 [{name_str}]\n" + my_stdout.getvalue().strip()
 
 def do_click(window, parts):
     control_name = parts[2]
@@ -357,8 +366,6 @@ def do_gridrows(window, parts):
     return "\n".join(lines)
 
 def do_listcontrols_stream(window, pipe):
-    write_pipe_stream(pipe, "OK:")
-    
     def is_key_control(ct, name):
         if ct in ["Button", "CheckBox", "RadioButton", "Edit", "ComboBox", "List", "DataGrid", "Table", "Tree", "ScrollBar", "TabItem", "MenuItem", "Slider", "Spinner", "Thumb"]:
             return True
@@ -375,6 +382,10 @@ def do_listcontrols_stream(window, pipe):
             return True
             
         win32gui.EnumChildWindows(window.handle, callback, None)
+        
+        # 只有在完全没有产生 handle 引用错误的情况下，再输出 OK: 防止异常日志被 C# 客户端的预见式 OK: 拦截吞噬
+        write_pipe_stream(pipe, "OK:")
+
         
         from pywinauto.handleprops import classname, text, isenabled
         for hwnd in hwnds:
