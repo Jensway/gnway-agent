@@ -598,46 +598,73 @@ namespace GnwayAgent
             mouse_event(MOUSEEVENTF_LEFTUP, pt.X, pt.Y, 0, 0);
         }
 
-        // ── listcontrols|窗口名[|深度(已弃用)] ────────────────────────
+        // ── listcontrols|窗口名[|深度] ────────────────────────
         // 返回: OK:\nType|Name|Enabled(1/0) 每行一个控件
         static string DoListControls(AutomationElement window, string[] parts)
         {
-            // 使用 FindAll(Descendants) 一次性获取所有 ControlView 元素，性能比递归 TreeWalker 高很多
+            int maxDepth = parts.Length > 2 && int.TryParse(parts[2], out int d) ? d : 15;
             var sb = new System.Text.StringBuilder("OK:\n");
-
+            
             try
             {
-                var elements = window.FindAll(TreeScope.Descendants, Automation.ControlViewCondition);
-                if (elements != null)
-                {
-                    foreach (AutomationElement el in elements)
-                    {
-                        try
-                        {
-                            string type    = el.Current.ControlType.ProgrammaticName
-                                               .Replace("ControlType.", "");
-                            string name    = el.Current.Name ?? "";
-                            bool   enabled = el.Current.IsEnabled;
-                            
-                            // 过滤掉空名且为纯容器的控件（减少噪音）
-                            bool isContainer = (type == "Pane" || type == "Document" || type == "Group" || type == "Window")
-                                               && string.IsNullOrEmpty(name);
-                                               
-                            if (!isContainer && type != "ScrollBar")
-                            {
-                                sb.AppendLine($"{type}|{name}|{(enabled ? "1" : "0")}");
-                            }
-                        }
-                        catch { /* 忽略已失效元素 */ }
-                    }
-                }
+                CollectControlsFast(window, 0, maxDepth, sb);
             }
             catch (Exception ex)
             {
-                return $"ERR:获取控件树失败: {ex.Message}";
+                return $"ERR:获取控件树异常: {ex.Message}";
             }
-
+            
             return sb.ToString().TrimEnd();
+        }
+
+        static void CollectControlsFast(AutomationElement el, int depth, int maxDepth, System.Text.StringBuilder sb)
+        {
+            string type = "";
+            try
+            {
+                if (depth > 0)
+                {
+                    type           = el.Current.ControlType.ProgrammaticName.Replace("ControlType.", "");
+                    string name    = el.Current.Name ?? "";
+                    bool   enabled = el.Current.IsEnabled;
+
+                    bool isContainer = (type == "Pane" || type == "Document" || type == "Group" || type == "Window")
+                                       && string.IsNullOrEmpty(name);
+                                       
+                    if (!isContainer && type != "ScrollBar")
+                    {
+                        sb.AppendLine($"{type}|{name}|{(enabled ? "1" : "0")}");
+                    }
+                }
+                else
+                {
+                    // depth 0 is the window itself
+                    type = "Window";
+                }
+
+                if (depth >= maxDepth) return;
+
+                // 核心防卡死优化：严禁深入遍历表格/列表的内部单元格！
+                // ERP的表格通常有成百上千个 Cell，遍历它们会导致 UIAutomation 彻底卡死超时。
+                if (type == "DataGrid" || type == "Table" || type == "List" || type == "Tree" || type == "ComboBox")
+                {
+                    return; // 遇到这类控件，直接停止向下遍历
+                }
+            }
+            catch { return; } // Skip dead elements
+
+            try
+            {
+                var walker = TreeWalker.ControlViewWalker;
+                var child = walker.GetFirstChild(el);
+                while (child != null)
+                {
+                    // 递归遍历子节点
+                    CollectControlsFast(child, depth + 1, maxDepth, sb);
+                    child = walker.GetNextSibling(child);
+                }
+            }
+            catch { }
         }
 
         // ── gridrows|窗口名|控件名[|最大行数] ─────────────────
