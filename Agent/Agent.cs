@@ -23,6 +23,7 @@ namespace GnwayAgent
     class Agent
     {
         const string PIPE_NAME = "GnwayAgentPipe";
+        static bool UseUiaEngine = false; // 双发引擎切换开关
 
         static void Main(string[] args)
         {
@@ -104,8 +105,29 @@ namespace GnwayAgent
                     {
                         string target = windows[menuIndex - 1];
                         Console.WriteLine($"\n========== [拉取全部控件树] {target} ==========");
-                        ProcessCommand($"listcontrols|{target}", Console.Out);
-                        Console.WriteLine("====================================================\n输入 'm' 刷新窗口列表，或直接继续输入你要测的其他动作。");
+                        
+                        using var ms = new MemoryStream();
+                        using var sw = new StreamWriter(ms, Encoding.UTF8) { AutoFlush = true };
+                        ProcessCommand($"listcontrols|{target}", sw);
+                        
+                        ms.Position = 0;
+                        using var sr = new StreamReader(ms, Encoding.UTF8);
+                        string fullOutput = sr.ReadToEnd();
+                        
+                        Console.WriteLine(fullOutput);
+                        
+                        // 写入文本文件以便用户自由复制
+                        try
+                        {
+                            File.WriteAllText("agent_dump.txt", fullOutput, Encoding.UTF8);
+                            Console.WriteLine("\n[⭐ 重要提示] 上述完整的控件树已自动保存到本程序同目录下的 agent_dump.txt 文件中！请直接打开它全选复制内容！");
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine($"\n[提示] 写入 txt 失败: {ex.Message}");
+                        }
+
+                        Console.WriteLine("====================================================\n输入 'm' 刷新窗口列表，或按 's' 切换引擎。");
                     }
                     else
                     {
@@ -114,14 +136,34 @@ namespace GnwayAgent
                     continue;
                 }
 
+                if (input.Trim().ToLower() == "s")
+                {
+                    UseUiaEngine = !UseUiaEngine;
+                    Console.WriteLine($"\n[引擎已切换] 当前扫描引擎: {(UseUiaEngine ? "UIA 全量深度扫描引擎 (防漏/最全面但稍慢)" : "Win32 原生平铺引擎 (极速防卡死)")}");
+                    PrintMenu();
+                    continue;
+                }
+
                 // 其他手敲的原始指令
                 Console.WriteLine($"\n--- [本地手动调试] 开始执行 {input} ---");
                 try
                 {
-                    string? result = ProcessCommand(input, Console.Out);
+                    using var ms = new MemoryStream();
+                    using var sw = new StreamWriter(ms, Encoding.UTF8) { AutoFlush = true };
+                    string? result = ProcessCommand(input, sw);
+                    
                     if (result != null)
                     {
                         Console.WriteLine(result);
+                    }
+                    else 
+                    {
+                        ms.Position = 0;
+                        using var sr = new StreamReader(ms, Encoding.UTF8);
+                        string output = sr.ReadToEnd();
+                        Console.WriteLine(output);
+                        File.WriteAllText("agent_dump.txt", output, Encoding.UTF8);
+                        Console.WriteLine("\n[⭐ 提示] 结果已导出至 agent_dump.txt 方便复制！");
                     }
                 }
                 catch (Exception ex)
@@ -158,9 +200,9 @@ namespace GnwayAgent
             Console.WriteLine("==================================");
             Console.WriteLine("请直接输入上方窗口前对应的【数字】（如 1 或 2）并按回车。");
             Console.WriteLine("Agent 将直接打印该窗口的所有底层 Win32 控件结构。");
-            Console.WriteLine("若窗口未显示，请按 'm' 键刷新列表。");
+            Console.WriteLine($"若窗口未显示，请按 'm' 键刷新列表。目前引擎: [{(UseUiaEngine ? "UIA全量" : "Win32极速")}] (按 's' 切换)");
             Console.WriteLine("网络客户端 NamedPipe 也仍在后台静默监听，随时可连接。");
-            Console.Write("\n请输入数字或指令: ");
+            Console.Write("\n请输入数字或指令 (s切换引擎/m刷新): ");
         }
 
         // =====================================================
@@ -802,6 +844,13 @@ namespace GnwayAgent
             writer.WriteLine("OK:"); // 流式标识首行
             try
             {
+                if (UseUiaEngine)
+                {
+                    WalkUiaTree(window, writer);
+                    return;
+                }
+
+                // == Win32 极速平铺引擎 ==
                 var hwnds = new System.Collections.Generic.List<IntPtr>();
                 EnumChildWindows((IntPtr)window.Current.NativeWindowHandle, (hWnd, lParam) =>
                 {
@@ -841,10 +890,9 @@ namespace GnwayAgent
                         else if (cl.Contains("slider") || cl.Contains("trackbar")) type = "Slider";
                         else if (cl.Contains("spin") || cl.Contains("updown")) type = "Spinner";
 
-                        if (IsKeyControl(type, name))
-                        {
-                            writer.WriteLine($"{type}|{name}|{(enabled ? "1" : "0")}");
-                        }
+                        // 不再利用 IsKeyControl 过滤任何数据，哪怕没名字，只要是控件都展示，附带底层类名帮助确认真实身份
+                        string displayName = string.IsNullOrEmpty(name) ? $"[类名:{cls}]" : $"{name} [类名:{cls}]";
+                        writer.WriteLine($"{type}|{displayName}|{(enabled ? "1" : "0")}");
                     }
                     catch { } // 忽略安全异常
                 }
@@ -855,34 +903,30 @@ namespace GnwayAgent
             }
         }
 
-        static bool IsKeyControl(string type, string name)
+        static void WalkUiaTree(AutomationElement el, TextWriter writer)
         {
-            switch (type)
+            var walker = TreeWalker.ControlViewWalker;
+            var child = walker.GetFirstChild(el);
+            while (child != null)
             {
-                case "Button":
-                case "CheckBox":
-                case "RadioButton":
-                case "Edit":
-                case "ComboBox":
-                case "List":
-                case "DataGrid":
-                case "Table":
-                case "Tree":
-                case "ScrollBar":
-                case "TabItem":
-                case "MenuItem":
-                case "Slider":
-                case "Spinner":
-                case "Thumb":
-                    return true;
-                case "Text":
-                case "Document":
-                    return !string.IsNullOrWhiteSpace(name);
-                default:
-                    // 容器层（如 Pane, Group 等），仅保留具有名字的，过滤无意义的纯嵌套壳
-                    return !string.IsNullOrWhiteSpace(name);
+                try
+                {
+                    string type = child.Current.ControlType.ProgrammaticName.Replace("ControlType.", "");
+                    string name = child.Current.Name ?? "";
+                    bool enabled = child.Current.IsEnabled;
+                    
+                    writer.WriteLine($"{type}|{name}|{(enabled ? "1" : "0")}");
+                    
+                    // 递归步进遍历，这种老式的深度先序遍历可以防止 .FindAll() 大平铺时的底层 IPC 超时崩溃
+                    WalkUiaTree(child, writer);
+                }
+                catch { } // 忽略中途失效的组件
+
+                child = walker.GetNextSibling(child);
             }
         }
+
+
 
         // ── gridrows|窗口名|控件名[|最大行数] ─────────────────
         // 返回: OK: 后每行是制表符分隔的单元格文字
