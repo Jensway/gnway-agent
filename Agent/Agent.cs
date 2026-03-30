@@ -61,9 +61,16 @@ namespace GnwayAgent
                     }
 
                     Console.WriteLine($"[收到] {cmdLine}");
-                    string result = ProcessCommand(cmdLine);
-                    writer.WriteLine(result);
-                    Console.WriteLine($"[返回] {result}\n");
+                    string? result = ProcessCommand(cmdLine, writer);
+                    if (result != null)
+                    {
+                        writer.WriteLine(result);
+                        Console.WriteLine($"[返回] {result}\n");
+                    }
+                    else
+                    {
+                        Console.WriteLine($"[返回] <流式输出已处理>\n");
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -83,7 +90,7 @@ namespace GnwayAgent
         //        tree|ERP系统
         //        windows      (列出所有窗口)
         // =====================================================
-        static string ProcessCommand(string cmdLine)
+        static string? ProcessCommand(string cmdLine, StreamWriter writer)
         {
             string[] parts = cmdLine.Split('|');
             string action = parts[0].ToLower().Trim();
@@ -120,6 +127,12 @@ namespace GnwayAgent
                 var window = FindWindow(appTitle)
                     ?? throw new Exception($"找不到窗口: {appTitle}");
 
+                if (action == "listcontrols")
+                {
+                    DoListControlsStream(window, parts, writer);
+                    return null;
+                }
+
                 return action switch
                 {
                     "click"        => DoClick(window, parts),
@@ -133,7 +146,6 @@ namespace GnwayAgent
                     "focus"        => DoFocus(window, parts),
                     "isenabled"    => DoIsEnabled(window, parts),
                     "popupinfo"    => DoPopupInfo(window, parts),
-                    "listcontrols" => DoListControls(window, parts),
                     "gridrows"     => DoGridRows(window, parts),
                     "gridselect"   => DoGridSelect(window, parts),
                     _              => $"ERR:未知动作 [{action}]"
@@ -599,66 +611,75 @@ namespace GnwayAgent
         }
 
         // ── listcontrols|窗口名[|深度] ────────────────────────
-        // 返回: OK:\nType|Name|Enabled(1/0) 每行一个控件
-        static string DoListControls(AutomationElement window, string[] parts)
+        // 返回流式结果（防止NamedPipe Semaphore Idle 超时）
+        static void DoListControlsStream(AutomationElement window, string[] parts, StreamWriter writer)
         {
             int maxDepth = parts.Length > 2 && int.TryParse(parts[2], out int d) ? d : 15;
-            var sb = new System.Text.StringBuilder("OK:\n");
-            
+            writer.WriteLine("OK:"); // 流式标识首行
             try
             {
-                CollectControlsFast(window, 0, maxDepth, sb);
+                CollectControlsFastStream(window, 0, maxDepth, writer);
             }
             catch (Exception ex)
             {
-                return $"ERR:获取控件树异常: {ex.Message}";
+                writer.WriteLine($"ERR:获取控件树异常: {ex.Message}");
             }
-            
-            return sb.ToString().TrimEnd();
         }
 
-        static void CollectControlsFast(AutomationElement el, int depth, int maxDepth, System.Text.StringBuilder sb)
+        static void CollectControlsFastStream(AutomationElement el, int depth, int maxDepth, StreamWriter writer)
         {
             string type = "";
             try
             {
                 if (depth > 0)
                 {
-                    type           = el.Current.ControlType.ProgrammaticName.Replace("ControlType.", "");
-                    string name    = el.Current.Name ?? "";
-                    bool   enabled = el.Current.IsEnabled;
+                    // 尝试从 Cached 读取（极大幅度减少 COM IPC 调用），否则回退到 Current
+                    try { type = el.Cached.ControlType.ProgrammaticName.Replace("ControlType.", ""); }
+                    catch { type = el.Current.ControlType.ProgrammaticName.Replace("ControlType.", ""); }
+
+                    string name;
+                    try { name = el.Cached.Name ?? ""; } catch { name = el.Current.Name ?? ""; }
+
+                    bool enabled;
+                    try { enabled = el.Cached.IsEnabled; } catch { enabled = el.Current.IsEnabled; }
 
                     if (IsKeyControl(type, name))
                     {
-                        sb.AppendLine($"{type}|{name}|{(enabled ? "1" : "0")}");
+                        writer.WriteLine($"{type}|{name}|{(enabled ? "1" : "0")}");
                     }
                 }
                 else
                 {
-                    // depth 0 is the window itself
                     type = "Window";
                 }
 
                 if (depth >= maxDepth) return;
 
                 // 核心防卡死优化：严禁深入遍历表格/列表的内部单元格！
-                // ERP的表格通常有成百上千个 Cell，遍历它们会导致 UIAutomation 彻底卡死超时。
                 if (type == "DataGrid" || type == "Table" || type == "List" || type == "Tree" || type == "ComboBox")
                 {
-                    return; // 遇到这类控件，直接停止向下遍历
+                    return; 
                 }
             }
             catch { return; } // Skip dead elements
 
             try
             {
-                var walker = TreeWalker.RawViewWalker;
-                var child = walker.GetFirstChild(el);
-                while (child != null)
+                AutomationElementCollection children;
+                // 一次性跨进程拉取本层所有子节点及其这三个属性的缓存快照！
+                using (var req = new CacheRequest())
                 {
-                    // 递归遍历子节点
-                    CollectControlsFast(child, depth + 1, maxDepth, sb);
-                    child = walker.GetNextSibling(child);
+                    req.Add(AutomationElement.ControlTypeProperty);
+                    req.Add(AutomationElement.NameProperty);
+                    req.Add(AutomationElement.IsEnabledProperty);
+                    req.TreeScope = TreeScope.Element | TreeScope.Children;
+
+                    children = el.FindAll(TreeScope.Children, Condition.TrueCondition);
+                }
+
+                foreach (AutomationElement child in children)
+                {
+                    CollectControlsFastStream(child, depth + 1, maxDepth, writer);
                 }
             }
             catch { }
