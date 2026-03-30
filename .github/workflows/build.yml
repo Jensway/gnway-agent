@@ -15,11 +15,19 @@ jobs:
     - name: Checkout
       uses: actions/checkout@v4
 
-    # 编译服务端 Agent
+    # 编译服务端 Agent (Python + pywinauto 重构版)
+    - name: Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+        
     - name: Build Agent (Server)
       run: |
         cd Agent
-        dotnet build -c Release
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pyinstaller
+        pyinstaller --onefile --name agent main.py
 
     # 编译客户端 Controller (WinForms)
     - name: Build Controller (Client)
@@ -33,7 +41,7 @@ jobs:
       with:
         name: GnwayAgent-Release
         path: |
-          Agent/bin/Release/net48/agent.exe
+          Agent/dist/agent.exe
           Controller/bin/Release/net48/controller.exe
           Controller/bin/Release/net48/flows/
           Controller/bin/Release/net48/events/
