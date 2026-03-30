@@ -353,15 +353,25 @@ namespace GnwayController
         private void LoadFlowsList()
         {
             _cbFlow.Items.Clear();
-            if (!Directory.Exists(_flowsDir)) return;
 
-            foreach (string f in Directory.GetFiles(_flowsDir, "*.json"))
-                _cbFlow.Items.Add(Path.GetFileNameWithoutExtension(f));
+            if (!Directory.Exists(_flowsDir))
+            {
+                try { Directory.CreateDirectory(_flowsDir); } catch { }
+                AppendLog($"⚠ 未找到 flows/ 目录，已自动创建于：\n{_flowsDir}\n请将 invoice.json 放入该目录。", LogLevel.Warn);
+                return;
+            }
+
+            foreach (string name in FlowLoader.ListFlowNames(_flowsDir))
+                _cbFlow.Items.Add(name);
 
             if (_cbFlow.Items.Count > 0)
             {
                 _cbFlow.SelectedIndex = 0;
                 TryLoadFlow();
+            }
+            else
+            {
+                AppendLog($"⚠ flows/ 目录中没有找到任何 .json 流程文件\n路径：{_flowsDir}", LogLevel.Warn);
             }
 
             _cbFlow.SelectedIndexChanged += (_, __) => TryLoadFlow();

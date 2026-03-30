@@ -7,15 +7,14 @@
     <Nullable>enable</Nullable>
     <LangVersion>latest</LangVersion>
     <UseWindowsForms>true</UseWindowsForms>
-    <ApplicationManifest>app.manifest</ApplicationManifest>
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- JSON 解析 -->
-    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+    <!-- .NET 4.8 内置，无需额外 DLL -->
+    <Reference Include="System.Web.Extensions" />
   </ItemGroup>
 
-  <!-- 将 flows/ 目录打包进输出目录 -->
+  <!-- 将 flows/ 目录复制到输出目录 -->
   <ItemGroup>
     <None Include="flows\**\*">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
