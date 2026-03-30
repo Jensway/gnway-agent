@@ -27,7 +27,7 @@ jobs:
         cd Controller
         dotnet build -c Release
 
-    # 上传编译结果（controller.exe + flows/ 目录）
+    # 上传编译结果（含 controller.exe, flows/ 以及 events/ 目录）
     - name: Upload Artifacts
       uses: actions/upload-artifact@v4
       with:
@@ -36,4 +36,5 @@ jobs:
           Agent/bin/Release/net48/agent.exe
           Controller/bin/Release/net48/controller.exe
           Controller/bin/Release/net48/flows/
+          Controller/bin/Release/net48/events/
         retention-days: 30
