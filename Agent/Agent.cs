@@ -667,13 +667,14 @@ namespace GnwayAgent
             {
                 AutomationElementCollection children;
                 // 一次性跨进程拉取本层所有子节点及其这三个属性的缓存快照！
-                using (var req = new CacheRequest())
-                {
-                    req.Add(AutomationElement.ControlTypeProperty);
-                    req.Add(AutomationElement.NameProperty);
-                    req.Add(AutomationElement.IsEnabledProperty);
-                    req.TreeScope = TreeScope.Element | TreeScope.Children;
+                var req = new CacheRequest();
+                req.Add(AutomationElement.ControlTypeProperty);
+                req.Add(AutomationElement.NameProperty);
+                req.Add(AutomationElement.IsEnabledProperty);
+                req.TreeScope = TreeScope.Element | TreeScope.Children;
 
+                using (req.Activate())
+                {
                     children = el.FindAll(TreeScope.Children, Condition.TrueCondition);
                 }
 
