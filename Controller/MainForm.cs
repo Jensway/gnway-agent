@@ -613,7 +613,8 @@ namespace GnwayController
                     {
                         Type        = cbA.Text,
                         ControlName = tbC.Text.Trim(),
-                        Value       = tbV.Text.Trim()
+                        Value       = tbV.Text.Trim(),
+                        MatchText   = tbV.Text.Trim() // 如果是 gridnext，把输入值作为匹配文本
                     }
                 };
                 _store.Save(evt);
