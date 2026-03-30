@@ -509,7 +509,7 @@ namespace GnwayAgent
 
             if (depth >= maxDepth) return;
 
-            var walker = TreeWalker.ControlViewWalker;
+            var walker = TreeWalker.RawViewWalker;
             var child = walker.GetFirstChild(el);
             while (child != null)
             {
@@ -559,7 +559,7 @@ namespace GnwayAgent
             if (type == ControlType.Button && !string.IsNullOrWhiteSpace(name))
                 buttons.Add(name.Trim());
 
-            var walker = TreeWalker.ControlViewWalker;
+            var walker = TreeWalker.RawViewWalker;
             var child  = walker.GetFirstChild(el);
             while (child != null)
             {
@@ -652,7 +652,7 @@ namespace GnwayAgent
 
             try
             {
-                var walker = TreeWalker.ControlViewWalker;
+                var walker = TreeWalker.RawViewWalker;
                 var child = walker.GetFirstChild(el);
                 while (child != null)
                 {
