@@ -376,13 +376,33 @@ def do_listcontrols_stream(window, pipe):
             
         win32gui.EnumChildWindows(window.handle, callback, None)
         
-        from pywinauto.uia_element_info import UIAElementInfo
+        from pywinauto.handleprops import classname, text, isenabled
         for hwnd in hwnds:
             try:
-                w = UIAElementInfo(hwnd)
-                ct = w.control_type or "Custom"
-                name = w.name or ""
-                enabled = 1 if w.enabled else 0
+                cls = classname(hwnd) or ""
+                name = text(hwnd) or ""
+                enabled = 1 if isenabled(hwnd) else 0
+                
+                cl = cls.lower()
+                ct = "Custom"
+                if "button" in cl or "btn" in cl: ct = "Button"
+                elif "checkbox" in cl or "check" in cl: ct = "CheckBox"
+                elif "radio" in cl: ct = "RadioButton"
+                elif "edit" in cl: ct = "Edit"
+                elif "combo" in cl: ct = "ComboBox"
+                elif "listview" in cl or "listbox" in cl or "list" in cl: ct = "List"
+                elif "grid" in cl or "table" in cl: ct = "DataGrid"
+                elif "tree" in cl: ct = "Tree"
+                elif "scrollbar" in cl: ct = "ScrollBar"
+                elif "tab" in cl: ct = "TabItem"
+                elif "menu" in cl: ct = "MenuItem"
+                elif "static" in cl or "label" in cl or "text" in cl: ct = "Text"
+                elif "slider" in cl or "trackbar" in cl: ct = "Slider"
+                elif "spin" in cl or "updown" in cl: ct = "Spinner"
+                else:
+                    # 如果不能识别精准控件类型，但也有文字，算作 Custom / 容器
+                    pass
+                
                 if is_key_control(ct, name):
                     write_pipe_stream(pipe, f"{ct}|{name}|{enabled}")
             except Exception:
