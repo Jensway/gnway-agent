@@ -542,7 +542,7 @@ namespace GnwayController
             }
 
             // ── 捕获快照（执行前） ────────────────────────────
-            string snapRaw = await Task.Run(() => client.Send($"listcontrols|{win}"));
+            string snapRaw = await Task.Run(() => client.Send($"listcontrols|{win}|10"));
             var snapshot = new ControlSnapshot
             {
                 Controls   = EventStore.ParseControlList(snapRaw),

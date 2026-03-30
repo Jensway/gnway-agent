@@ -611,26 +611,35 @@ namespace GnwayAgent
         static void CollectControls(AutomationElement el, int depth, int maxDepth,
                                     System.Text.StringBuilder sb)
         {
-            if (depth > 0)  // depth 0 是窗口本身，跳过
+            try
             {
-                string type    = el.Current.ControlType.ProgrammaticName
-                                   .Replace("ControlType.", "");
-                string name    = el.Current.Name ?? "";
-                bool   enabled = el.Current.IsEnabled;
-                // 过滤掉空名且为纯容器的控件（减少噪音）
-                bool isContainer = (type == "Pane" || type == "Document" || type == "Group")
-                                   && string.IsNullOrEmpty(name);
-                if (!isContainer && type != "ScrollBar")
-                    sb.AppendLine($"{type}|{name}|{(enabled ? "1" : "0")}");
+                if (depth > 0)  // depth 0 是窗口本身，跳过
+                {
+                    string type    = el.Current.ControlType.ProgrammaticName
+                                       .Replace("ControlType.", "");
+                    string name    = el.Current.Name ?? "";
+                    bool   enabled = el.Current.IsEnabled;
+                    // 过滤掉空名且为纯容器的控件（减少噪音）
+                    bool isContainer = (type == "Pane" || type == "Document" || type == "Group")
+                                       && string.IsNullOrEmpty(name);
+                    if (!isContainer && type != "ScrollBar")
+                        sb.AppendLine($"{type}|{name}|{(enabled ? "1" : "0")}");
+                }
+                if (depth >= maxDepth) return;
             }
-            if (depth >= maxDepth) return;
-            var walker = TreeWalker.ControlViewWalker;
-            var child  = walker.GetFirstChild(el);
-            while (child != null)
+            catch { return; } // Skip controls that throw ElementNotAvailableException
+
+            try
             {
-                CollectControls(child, depth + 1, maxDepth, sb);
-                child = walker.GetNextSibling(child);
+                var walker = TreeWalker.ControlViewWalker;
+                var child  = walker.GetFirstChild(el);
+                while (child != null)
+                {
+                    CollectControls(child, depth + 1, maxDepth, sb);
+                    child = walker.GetNextSibling(child);
+                }
             }
+            catch { }
         }
 
         // ── gridrows|窗口名|控件名[|最大行数] ─────────────────

@@ -173,7 +173,7 @@ namespace GnwayController.Engine
         {
             try
             {
-                string result = _client.Send($"listcontrols|{evt.WindowName}");
+                string result = _client.Send($"listcontrols|{evt.WindowName}|10");
                 if (!result.StartsWith("OK:")) return false;
 
                 var current  = EventStore.ParseControlList(result);
