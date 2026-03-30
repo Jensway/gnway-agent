@@ -14,9 +14,12 @@
     <Reference Include="System.Web.Extensions" />
   </ItemGroup>
 
-  <!-- 将 flows/ 目录复制到输出目录 -->
+  <!-- 将 flows/ 录制事件目录复制到输出目录 -->
   <ItemGroup>
     <None Include="flows\**\*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="events\**\*">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>

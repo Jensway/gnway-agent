@@ -122,18 +122,21 @@ namespace GnwayAgent
 
                 return action switch
                 {
-                    "click"       => DoClick(window, parts),
-                    "input"       => DoInput(window, parts),
-                    "scroll"      => DoScroll(window, parts),
-                    "scrollto"    => DoScrollTo(window, parts),
-                    "wait"        => DoWait(appTitle, parts),
-                    "gettext"     => DoGetText(window, parts),
-                    "exists"      => DoExists(window, parts),
-                    "select"      => DoSelect(window, parts),
-                    "focus"       => DoFocus(window, parts),
-                    "isenabled"   => DoIsEnabled(window, parts),
-                    "popupinfo"   => DoPopupInfo(window, parts),
-                    _             => $"ERR:未知动作 [{action}]"
+                    "click"        => DoClick(window, parts),
+                    "input"        => DoInput(window, parts),
+                    "scroll"       => DoScroll(window, parts),
+                    "scrollto"     => DoScrollTo(window, parts),
+                    "wait"         => DoWait(appTitle, parts),
+                    "gettext"      => DoGetText(window, parts),
+                    "exists"       => DoExists(window, parts),
+                    "select"       => DoSelect(window, parts),
+                    "focus"        => DoFocus(window, parts),
+                    "isenabled"    => DoIsEnabled(window, parts),
+                    "popupinfo"    => DoPopupInfo(window, parts),
+                    "listcontrols" => DoListControls(window, parts),
+                    "gridrows"     => DoGridRows(window, parts),
+                    "gridselect"   => DoGridSelect(window, parts),
+                    _              => $"ERR:未知动作 [{action}]"
                 };
             }
             catch (Exception ex)
@@ -586,13 +589,140 @@ namespace GnwayAgent
         [System.Runtime.InteropServices.DllImport("user32.dll")]
         static extern void mouse_event(uint dwFlags, int dx, int dy, uint dwData, int dwExtraInfo);
         const uint MOUSEEVENTF_LEFTDOWN = 0x0002;
-        const uint MOUSEEVENTF_LEFTUP = 0x0004;
+        const uint MOUSEEVENTF_LEFTUP   = 0x0004;
 
         static void SimulateClick(System.Drawing.Point pt)
         {
             mouse_event(MOUSEEVENTF_LEFTDOWN, pt.X, pt.Y, 0, 0);
             Thread.Sleep(50);
             mouse_event(MOUSEEVENTF_LEFTUP, pt.X, pt.Y, 0, 0);
+        }
+
+        // ── listcontrols|窗口名[|深度] ────────────────────────
+        // 返回: OK:Type|Name|Enabled(1/0) 每行一个控件
+        static string DoListControls(AutomationElement window, string[] parts)
+        {
+            int depth = parts.Length > 2 && int.TryParse(parts[2], out int d) ? d : 4;
+            var sb = new System.Text.StringBuilder("OK:");
+            CollectControls(window, 0, depth, sb);
+            return sb.ToString().TrimEnd();
+        }
+
+        static void CollectControls(AutomationElement el, int depth, int maxDepth,
+                                    System.Text.StringBuilder sb)
+        {
+            if (depth > 0)  // depth 0 是窗口本身，跳过
+            {
+                string type    = el.Current.ControlType.ProgrammaticName
+                                   .Replace("ControlType.", "");
+                string name    = el.Current.Name ?? "";
+                bool   enabled = el.Current.IsEnabled;
+                // 过滤掉空名且为纯容器的控件（减少噪音）
+                bool isContainer = (type == "Pane" || type == "Document" || type == "Group")
+                                   && string.IsNullOrEmpty(name);
+                if (!isContainer && type != "ScrollBar")
+                    sb.AppendLine($"{type}|{name}|{(enabled ? "1" : "0")}");
+            }
+            if (depth >= maxDepth) return;
+            var walker = TreeWalker.ControlViewWalker;
+            var child  = walker.GetFirstChild(el);
+            while (child != null)
+            {
+                CollectControls(child, depth + 1, maxDepth, sb);
+                child = walker.GetNextSibling(child);
+            }
+        }
+
+        // ── gridrows|窗口名|控件名[|最大行数] ─────────────────
+        // 返回: OK: 后每行是制表符分隔的单元格文字
+        static string DoGridRows(AutomationElement window, string[] parts)
+        {
+            string controlName = parts[2];
+            int maxRows = parts.Length > 3 && int.TryParse(parts[3], out int m) ? m : 500;
+
+            var grid   = FindControl(window, controlName);
+            var sb     = new System.Text.StringBuilder("OK:");
+            var walker = TreeWalker.ControlViewWalker;
+            var child  = walker.GetFirstChild(grid);
+            int rowIdx = 0;
+
+            while (child != null && rowIdx < maxRows)
+            {
+                var ct = child.Current.ControlType;
+                if (ct == ControlType.DataItem ||
+                    ct == ControlType.ListItem  ||
+                    ct == ControlType.TreeItem)
+                {
+                    var cols  = new System.Collections.Generic.List<string>();
+                    var cell  = walker.GetFirstChild(child);
+                    while (cell != null)
+                    {
+                        string txt = GetCellText(cell);
+                        cols.Add(txt);
+                        cell = walker.GetNextSibling(cell);
+                    }
+                    // 若没有子单元格，直接取行 Name
+                    if (cols.Count == 0)
+                        cols.Add(child.Current.Name ?? "");
+                    sb.AppendLine(string.Join("\t", cols));
+                    rowIdx++;
+                }
+                child = walker.GetNextSibling(child);
+            }
+            return sb.ToString().TrimEnd();
+        }
+
+        static string GetCellText(AutomationElement el)
+        {
+            if (el.TryGetCurrentPattern(ValuePattern.Pattern, out object? vp))
+                return ((ValuePattern)vp).Current.Value ?? "";
+            return el.Current.Name ?? "";
+        }
+
+        // ── gridselect|窗口名|控件名|行索引 ───────────────────
+        // 按 0-based 行索引选中该行
+        static string DoGridSelect(AutomationElement window, string[] parts)
+        {
+            string controlName = parts[2];
+            if (!int.TryParse(parts[3], out int rowIndex))
+                return "ERR:行索引必须是整数";
+
+            var grid   = FindControl(window, controlName);
+            var walker = TreeWalker.ControlViewWalker;
+            var child  = walker.GetFirstChild(grid);
+            int current = 0, total = 0;
+
+            while (child != null)
+            {
+                var ct = child.Current.ControlType;
+                if (ct == ControlType.DataItem ||
+                    ct == ControlType.ListItem  ||
+                    ct == ControlType.TreeItem)
+                {
+                    if (current == rowIndex)
+                    {
+                        // 优先 SelectionItemPattern
+                        if (child.TryGetCurrentPattern(SelectionItemPattern.Pattern, out object? sp))
+                            ((SelectionItemPattern)sp).Select();
+                        else
+                        {
+                            child.SetFocus();
+                            var rect = child.Current.BoundingRectangle;
+                            var pt   = new System.Drawing.Point(
+                                (int)(rect.Left + 5),
+                                (int)(rect.Top  + rect.Height / 2));
+                            System.Windows.Forms.Cursor.Position = pt;
+                            Thread.Sleep(60);
+                            SimulateClick(pt);
+                        }
+                        return $"OK:已选第{rowIndex}行";
+                    }
+                    current++;
+                    total++;
+                }
+                child = walker.GetNextSibling(child);
+            }
+            return $"ERR:行索引{rowIndex}超出范围（共{total}行）";
         }
     }
 }
