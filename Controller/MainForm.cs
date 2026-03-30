@@ -573,7 +573,7 @@ namespace GnwayController
         {
             if (_lastSnapshot == null || _lastAction == null) return;
 
-            string? name = PromptInput("保存事件", "请为该步骤取一个名称（如 "选待处理行"）：",
+            string? name = PromptInput("保存事件", @"请为该步骤取一个名称（如 ""选待处理行""）：",
                                        _lastAction.Describe());
             if (string.IsNullOrWhiteSpace(name)) return;
 
