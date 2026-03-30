@@ -565,7 +565,7 @@ namespace GnwayAgent
         {
             var searchRoots = new System.Collections.Generic.List<AutomationElement>();
             
-            // 如果指定了父容器，先尝试用 Win32 HWND 瞬间遍历查父容器
+            // 如果指定了父容器，先尝试寻找父容器
             if (!string.IsNullOrEmpty(parentName))
             {
                 var parentHwnds = new System.Collections.Generic.List<IntPtr>();
@@ -605,6 +605,52 @@ namespace GnwayAgent
             {
                 searchRoots.Add(root);
             }
+
+            // ====== 新增：独创魔法编号系统追踪 ======
+            // 拦截我们自己生成的类似于 <Edit1>、<Button3> 的绝对顺序编号
+            var match = System.Text.RegularExpressions.Regex.Match(controlName, @"^<([A-Za-z]+)(\d+)>$");
+            if (match.Success)
+            {
+                string targetType = match.Groups[1].Value.ToLower();
+                int targetIndex = int.Parse(match.Groups[2].Value);
+                int currentTypeCount = 0;
+                AutomationElement? targetElement = null;
+
+                // 采用和 ListControls 完全同源的递归下钻法，以保证计数的绝对一致
+                bool WalkForMagicName(AutomationElement currentRoot)
+                {
+                    var walker = TreeWalker.RawViewWalker;
+                    var c = walker.GetFirstChild(currentRoot);
+                    while (c != null)
+                    {
+                        try 
+                        {
+                            string t = c.Current.ControlType.ProgrammaticName.Replace("ControlType.", "").ToLower();
+                            if (t == targetType)
+                            {
+                                currentTypeCount++;
+                                if (currentTypeCount == targetIndex)
+                                {
+                                    targetElement = c;
+                                    return true;
+                                }
+                            }
+                            if (WalkForMagicName(c)) return true;
+                        } catch {}
+                        c = walker.GetNextSibling(c);
+                    }
+                    return false;
+                }
+
+                foreach (var sRoot in searchRoots)
+                {
+                    if (WalkForMagicName(sRoot)) break;
+                }
+
+                if (targetElement != null) return targetElement;
+                throw new Exception($"采用绝对编号路径未能发现控件: {controlName}");
+            }
+            // ===================================
 
             var matches = new System.Collections.Generic.List<AutomationElement>();
 
@@ -844,8 +890,9 @@ namespace GnwayAgent
             {
                 // == 统一全能引擎 (Unified Engine) ==
                 // 结合 Win32 的极速执行与 UIA 的完整感知，我们在这里使用 RawViewWalker 获取 100% 全量元素。
-                // 摒弃了会造成死锁的 FindAll()。
-                WalkUnifiedTree(window, writer, 1);
+                // 采用一个字典针对当前所有遇到的类别进行排序，生成类似于 <Edit1> 的绝对追踪码。
+                var counters = new System.Collections.Generic.Dictionary<string, int>();
+                WalkUnifiedTree(window, writer, 1, counters);
             }
             catch (Exception ex)
             {
@@ -853,7 +900,7 @@ namespace GnwayAgent
             }
         }
 
-        static void WalkUnifiedTree(AutomationElement el, TextWriter writer, int depth = 1)
+        static void WalkUnifiedTree(AutomationElement el, TextWriter writer, int depth, System.Collections.Generic.Dictionary<string, int> counters)
         {
             // 使用 RawViewWalker 可确保即使是没有名字、但占据核心排版位置的 Win32 或 WPF 隐藏容器也绝不遗漏
             var walker = TreeWalker.RawViewWalker;
@@ -863,13 +910,19 @@ namespace GnwayAgent
                 try
                 {
                     string type = child.Current.ControlType.ProgrammaticName.Replace("ControlType.", "");
+                    
+                    int count = counters.ContainsKey(type) ? counters[type] + 1 : 1;
+                    counters[type] = count;
+                    string magicId = $"<{type}{count}>";
+
                     string name = child.Current.Name ?? "";
                     string aid  = child.Current.AutomationId ?? "";
                     string cls  = child.Current.ClassName ?? "";
                     bool enabled = child.Current.IsEnabled;
                     bool visible = !child.Current.IsOffscreen;
 
-                    string display = string.IsNullOrWhiteSpace(name) ? "[无名]" : name;
+                    // 将魔法跟踪码强行放置于名称头部
+                    string display = string.IsNullOrWhiteSpace(name) ? magicId : $"{magicId} {name}";
                     
                     if (!string.IsNullOrWhiteSpace(aid) && aid != name)
                         display += $" (ID:{aid})";
@@ -884,7 +937,7 @@ namespace GnwayAgent
                     {
                         var rect = child.Current.BoundingRectangle;
                         if (!rect.IsEmpty && visible)
-                            display += $" [位置:{(int)rect.X},{(int)rect.Y} 宽:{(int)rect.Width}]";
+                            display += $" [矩形:{(int)rect.X},{(int)rect.Y} 宽:{(int)rect.Width}]";
                     } 
                     catch { }
 
@@ -892,7 +945,7 @@ namespace GnwayAgent
                     writer.WriteLine($"{type}|{pad}{display}|{(enabled ? "1" : "0")}");
                     
                     // 递归步进遍历，生成树状分支
-                    WalkUnifiedTree(child, writer, depth + 1);
+                    WalkUnifiedTree(child, writer, depth + 1, counters);
                 }
                 catch { } // 忽略中途失效的组件
 
