@@ -315,7 +315,10 @@ namespace GnwayController
             _btnEvtDown = Btn("↓", btnBar, new Point(bx, 4), 30, C_BG, C_TEXT); bx += 36;
             _btnEvtDown.Click += (_, __) => MoveEvt(+1);
             _btnEvtDel  = Btn("🗑 删除", btnBar, new Point(bx, 4), 64, Color.FromArgb(220, 53, 69), Color.White);
-            _btnEvtDel.Click += OnEvtDelete;
+            _btnEvtDel.Click += OnEvtDelete; bx += 70;
+            
+            var btnEvtManual = Btn("✍ 手动添加(已知名称)", btnBar, new Point(bx, 4), 130, Color.FromArgb(100, 116, 139), Color.White);
+            btnEvtManual.Click += OnEvtAddManual;
 
             // 事件列表
             _lvEvents = new ListView {
@@ -567,8 +570,58 @@ namespace GnwayController
         }
 
         // =====================================================
-        //  保存事件
+        //  保存与手动添加事件
         // =====================================================
+        private void OnEvtAddManual(object? s, EventArgs e)
+        {
+            using var dlg = new Form {
+                Text = "✍ 手动添加步骤 (已知名称)", Size = new Size(380, 260),
+                FormBorderStyle = FormBorderStyle.FixedDialog, StartPosition = FormStartPosition.CenterParent
+            };
+            var lblW = new Label { Text = "目标窗口:", Location = new Point(12, 12), AutoSize = true };
+            var tbW  = new TextBox { Text = _tbWindow.Text.Trim(), Location = new Point(80, 10), Width = 260 };
+            
+            var lblC = new Label { Text = "控件名称:", Location = new Point(12, 42), AutoSize = true };
+            var tbC  = new TextBox { Text = "生成按钮", Location = new Point(80, 40), Width = 260 };
+            
+            var lblA = new Label { Text = "动作类型:", Location = new Point(12, 72), AutoSize = true };
+            var cbA  = new ComboBox { Location = new Point(80, 70), Width = 260, DropDownStyle = ComboBoxStyle.DropDownList };
+            cbA.Items.AddRange(new[] { "click", "input", "select", "gridnext", "popupclick", "sleep" });
+            cbA.SelectedIndex = 0;
+            
+            var lblV = new Label { Text = "输入值:", Location = new Point(12, 102), AutoSize = true };
+            var tbV  = new TextBox { Text = "", Location = new Point(80, 100), Width = 260 };
+            
+            var lblN = new Label { Text = "步骤名:", Location = new Point(12, 132), AutoSize = true };
+            var tbN  = new TextBox { Text = "手动点击", Location = new Point(80, 130), Width = 260 };
+
+            var btnOk = new Button { Text = "保存", DialogResult = DialogResult.OK, Location = new Point(150, 175), Width = 90 };
+            var btnCn = new Button { Text = "取消", DialogResult = DialogResult.Cancel, Location = new Point(250, 175), Width = 90 };
+
+            dlg.Controls.AddRange(new Control[] { lblW, tbW, lblC, tbC, lblA, cbA, lblV, tbV, lblN, tbN, btnOk, btnCn });
+            dlg.AcceptButton = btnOk; dlg.CancelButton = btnCn;
+
+            if (dlg.ShowDialog() == DialogResult.OK)
+            {
+                var evt = new AutoEvent
+                {
+                    Id         = EventStore.NewId(),
+                    Name       = tbN.Text.Trim(),
+                    WindowName = tbW.Text.Trim(),
+                    Snapshot   = new ControlSnapshot(), // 空快照，因为 FlowRunner 现在只检查 exists，不验证整个树了
+                    Action     = new EventAction
+                    {
+                        Type        = cbA.Text,
+                        ControlName = tbC.Text.Trim(),
+                        Value       = tbV.Text.Trim()
+                    }
+                };
+                _store.Save(evt);
+                ReloadEvents();
+                AppendLog($"💾 手动事件「{evt.Name}」已保存。", C_OK);
+            }
+        }
+
         private void OnSaveEvent(object? s, EventArgs e)
         {
             if (_lastSnapshot == null || _lastAction == null) return;

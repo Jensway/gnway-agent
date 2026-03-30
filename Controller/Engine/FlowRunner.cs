@@ -173,21 +173,20 @@ namespace GnwayController.Engine
         {
             try
             {
-                string result = _client.Send($"listcontrols|{evt.WindowName}|10");
-                if (!result.StartsWith("OK:")) return false;
-
-                var current  = EventStore.ParseControlList(result);
-                var expected = evt.Snapshot.Controls;
-
-                if (current.Count != expected.Count) return false;
-
-                for (int i = 0; i < current.Count; i++)
+                // 核心防超时优化：不再使用极度耗时的 listcontrols 获取上千个控件去比对
+                // 而是直接使用精准测试：检查目标窗口和目标控件是否已经存在
+                string checkCmd;
+                if (!string.IsNullOrEmpty(evt.Action.ControlName))
                 {
-                    if (current[i].Type    != expected[i].Type)    return false;
-                    if (current[i].Name    != expected[i].Name)    return false;
-                    if (current[i].Enabled != expected[i].Enabled) return false;
+                    checkCmd = $"exists|{evt.WindowName}|{evt.Action.ControlName}";
                 }
-                return true;
+                else
+                {
+                    checkCmd = $"windowexists|{evt.WindowName}";
+                }
+
+                string result = _client.Send(checkCmd);
+                return result.StartsWith("OK:true");
             }
             catch { return false; }
         }
