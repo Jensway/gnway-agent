@@ -58,6 +58,10 @@ namespace GnwayController
         Label   _lblStatus = null!;
         ProgressBar _pb    = null!;
 
+        // ── 调试台控件 ── 
+        TextBox     _tbDebugCmd    = null!;
+        RichTextBox _rtDebugResult = null!;
+
         // ── 引擎状态 ─────────────────────────────────────────
         FlowEngine?     _engine;
         FlowDefinition? _flow;
@@ -157,10 +161,24 @@ namespace GnwayController
             };
             toolbar.Controls.Add(_lblConn);
 
-            // ── 主体 — SplitContainer ─────────────────────────
-            // 注意：Panel2MinSize 和 SplitterDistance 不能在初始化器中设置，
-            // 因为控件布局前 Width=0，任何约束校验都会抛出 InvalidOperationException。
-            // 必须延迟到 Load 事件后（窗体已显示、Width 已确定）再赋值。
+            // ── 主体 — TabControl（执行监控 + 调试台）──────────
+            var tabs = new TabControl
+            {
+                Dock      = DockStyle.Fill,
+                Font      = F_BODY,
+                BackColor = C_BG
+            };
+            Controls.Add(tabs);
+            tabs.BringToFront();
+
+            // Tab1：执行监控
+            var tabRun = new TabPage("▶  执行监控")
+            {
+                BackColor = C_BG,
+                Padding   = new Padding(0)
+            };
+            tabs.TabPages.Add(tabRun);
+
             var splitter = new SplitContainer
             {
                 Dock          = DockStyle.Fill,
@@ -169,9 +187,7 @@ namespace GnwayController
                 Orientation   = Orientation.Vertical,
                 Panel1MinSize = 160
             };
-            Controls.Add(splitter);
-            splitter.BringToFront();
-            // 窗体 Load 后再设置分隔位置和右侧最小宽度
+            tabRun.Controls.Add(splitter);
             this.Load += (_, __) =>
             {
                 splitter.Panel2MinSize    = 300;
@@ -180,9 +196,17 @@ namespace GnwayController
 
             // 左：步骤面板
             BuildStepPanel(splitter.Panel1);
-
             // 右：日志面板
             BuildLogPanel(splitter.Panel2);
+
+            // Tab2：调试台
+            var tabDbg = new TabPage("🔍  调试台")
+            {
+                BackColor = C_BG,
+                Padding   = new Padding(0)
+            };
+            tabs.TabPages.Add(tabDbg);
+            BuildDebugTab(tabDbg);
 
             // ── 底部状态栏 ───────────────────────────────────
             var statusBar = new Panel
@@ -649,6 +673,145 @@ namespace GnwayController
             btn.FlatAppearance.MouseDownBackColor  = ControlPaint.Dark(backColor, 0.1f);
             parent.Controls.Add(btn);
             return btn;
+        }
+
+        // =====================================================
+        //  调试台 — 构建 & 事件
+        // =====================================================
+        private void BuildDebugTab(TabPage page)
+        {
+            // ── 顶部：命令输入行 ──────────────────────────────
+            var topBar = new Panel
+            {
+                Dock      = DockStyle.Top,
+                Height    = 46,
+                BackColor = C_CARD,
+                Padding   = new Padding(8, 0, 8, 0)
+            };
+            topBar.Paint += (s, e) =>
+                e.Graphics.DrawLine(new Pen(C_BORDER, 1), 0, topBar.Height - 1, topBar.Width, topBar.Height - 1);
+            page.Controls.Add(topBar);
+
+            _tbDebugCmd = new TextBox
+            {
+                Text        = "windows",
+                Font        = F_LOG,
+                BorderStyle = BorderStyle.FixedSingle,
+                Location    = new Point(8, 10),
+                Width       = 440,
+                Height      = 26
+            };
+            topBar.Controls.Add(_tbDebugCmd);
+
+            var btnSend = MkBtn("▶ 发送", topBar, new Point(458, 9), 72, C_ACCENT, Color.White);
+            btnSend.Click += OnDebugSend;
+            // 回车直接发送
+            _tbDebugCmd.KeyDown += (s, e) =>
+            {
+                if (e.KeyCode == Keys.Enter) { OnDebugSend(null, EventArgs.Empty); e.SuppressKeyPress = true; }
+            };
+
+            // ── 快捷命令按钮 ─────────────────────────────────
+            var shortcuts = new (string Label, string Cmd)[]
+            {
+                ("列举窗口",  "windows"),
+                ("快照",      "snapshot"),
+                ("发票管理树", "tree|发票管理|5"),
+                ("发票详情树", "tree|发票详情|5"),
+                ("清空",      "")
+            };
+            int bx = 540;
+            foreach (var (label, cmd) in shortcuts)
+            {
+                string c = cmd; // 闭包捕获
+                var b = MkBtn(label, topBar, new Point(bx, 9), 72, C_BG, C_TEXT);
+                b.Font = F_SMALL;
+                b.Click += (s, e) =>
+                {
+                    if (c == "") { _rtDebugResult.Clear(); return; }
+                    _tbDebugCmd.Text = c;
+                    OnDebugSend(null, EventArgs.Empty);
+                };
+                bx += 78;
+            }
+
+            // ── 说明标签 ─────────────────────────────────────
+            var hintHdr = new Panel
+            {
+                Dock      = DockStyle.Top,
+                Height    = 28,
+                BackColor = Color.FromArgb(37, 99, 185)
+            };
+            var hintLbl = new Label
+            {
+                Text      = "原始返回结果（可直接复制控件名填写 JSON 流程）",
+                Dock      = DockStyle.Fill,
+                Font      = F_SMALL,
+                ForeColor = Color.White,
+                TextAlign = ContentAlignment.MiddleLeft,
+                BackColor = Color.Transparent,
+                Padding   = new Padding(8, 0, 0, 0)
+            };
+            hintHdr.Controls.Add(hintLbl);
+            page.Controls.Add(hintHdr);
+
+            // ── 结果显示区 ───────────────────────────────────
+            _rtDebugResult = new RichTextBox
+            {
+                Dock        = DockStyle.Fill,
+                Font        = F_LOG,
+                BackColor   = Color.FromArgb(20, 24, 36),
+                ForeColor   = Color.FromArgb(200, 215, 240),
+                BorderStyle = BorderStyle.None,
+                ReadOnly    = true,
+                ScrollBars  = RichTextBoxScrollBars.Both,
+                WordWrap    = false
+            };
+            page.Controls.Add(_rtDebugResult);
+
+            // 提示文字
+            _rtDebugResult.AppendText("── 调试台就绪 ──\r\n");
+            _rtDebugResult.AppendText("左上方输入命令后按 [▶ 发送] 或回车，使用快捷按钮可快速探查控件树。\r\n\r\n");
+            _rtDebugResult.AppendText("常用命令:\r\n");
+            _rtDebugResult.AppendText("  windows              → 列出所有可见窗口（找正确窗口名）\r\n");
+            _rtDebugResult.AppendText("  snapshot             → 获取窗口快照（用于弹窗检测）\r\n");
+            _rtDebugResult.AppendText("  tree|窗口名|深度     → 打印控件树（找控件Name/AutomationId）\r\n");
+            _rtDebugResult.AppendText("  click|窗口名|控件名  → 测试点击\r\n");
+            _rtDebugResult.AppendText("  select|窗口名|控件名|选项 → 测试下拉选择\r\n");
+            _rtDebugResult.AppendText("  exists|窗口名|控件名 → 检查控件是否存在\r\n");
+        }
+
+        private async void OnDebugSend(object? sender, EventArgs e)
+        {
+            string cmd = _tbDebugCmd.Text.Trim();
+            if (string.IsNullOrEmpty(cmd)) return;
+
+            string server = _tbServer.Text.Trim();
+            var client = new AgentClient(server, timeoutMs: 20000);
+
+            // UI 上显示发出的命令
+            AppendDebug($"\r\n[{DateTime.Now:HH:mm:ss}] >>> {cmd}", Color.FromArgb(100, 200, 255));
+
+            string result = await Task.Run(() => client.Send(cmd));
+
+            // 根据成功/失败着色
+            bool ok = result.StartsWith("OK");
+            AppendDebug(result, ok ? Color.FromArgb(150, 230, 150) : Color.FromArgb(255, 120, 100));
+        }
+
+        private void AppendDebug(string text, Color color)
+        {
+            if (_rtDebugResult.InvokeRequired)
+            {
+                _rtDebugResult.Invoke((Action)(() => AppendDebug(text, color)));
+                return;
+            }
+            _rtDebugResult.SelectionStart  = _rtDebugResult.TextLength;
+            _rtDebugResult.SelectionLength = 0;
+            _rtDebugResult.SelectionColor  = color;
+            _rtDebugResult.AppendText(text + "\r\n");
+            _rtDebugResult.SelectionColor  = _rtDebugResult.ForeColor;
+            _rtDebugResult.ScrollToCaret();
         }
 
         protected override void OnFormClosing(FormClosingEventArgs e)
