@@ -160,16 +160,21 @@ namespace GnwayController
             // ── 主体 — SplitContainer ─────────────────────────
             var splitter = new SplitContainer
             {
-                Dock             = DockStyle.Fill,
-                SplitterWidth    = 6,
-                SplitterDistance = 230,
-                BackColor        = C_BG,
-                Orientation      = Orientation.Vertical,
-                Panel1MinSize    = 160,
-                Panel2MinSize    = 300
+                Dock          = DockStyle.Fill,
+                SplitterWidth = 6,
+                BackColor     = C_BG,
+                Orientation   = Orientation.Vertical,
+                Panel1MinSize = 160,
+                Panel2MinSize = 200   // 初始化阶段使用较小值，避免约束冲突
             };
             Controls.Add(splitter);
             splitter.BringToFront();
+            // 待窗体布局完成后再设置实际分隔位置和最小尺寸
+            this.Load += (_, __) =>
+            {
+                splitter.Panel2MinSize    = 300;
+                splitter.SplitterDistance = 230;
+            };
 
             // 左：步骤面板
             BuildStepPanel(splitter.Panel1);
