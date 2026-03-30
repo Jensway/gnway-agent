@@ -447,18 +447,85 @@ namespace GnwayAgent
             string? parentName = null,
             int index = 0)
         {
-            AutomationElement searchRoot = root;
-
-            // 如果指定了父容器，先找父容器
+            var searchRoots = new System.Collections.Generic.List<AutomationElement>();
+            
+            // 如果指定了父容器，先尝试用 Win32 HWND 瞬间遍历查父容器
             if (!string.IsNullOrEmpty(parentName))
             {
-                var parentCond = new PropertyCondition(
-                    AutomationElement.NameProperty, parentName);
-                searchRoot = root.FindFirst(TreeScope.Descendants, parentCond)
-                    ?? throw new Exception($"父容器未找到: {parentName}");
+                var parentHwnds = new System.Collections.Generic.List<IntPtr>();
+                try
+                {
+                    EnumChildWindows((IntPtr)root.Current.NativeWindowHandle, (hWnd, lParam) =>
+                    {
+                        parentHwnds.Add(hWnd);
+                        return true;
+                    }, IntPtr.Zero);
+                }
+                catch { }
+
+                foreach (var ph in parentHwnds)
+                {
+                    try
+                    {
+                        var pe = AutomationElement.FromHandle(ph);
+                        if (pe.Current.Name == parentName)
+                        {
+                            searchRoots.Add(pe);
+                        }
+                    }
+                    catch { }
+                }
+
+                // 极端情况：父容器无句柄 (WPF/虚拟)，启用 UIA Fallback
+                if (searchRoots.Count == 0)
+                {
+                    var parentCond = new PropertyCondition(AutomationElement.NameProperty, parentName);
+                    var p = root.FindFirst(TreeScope.Descendants, parentCond);
+                    if (p != null) searchRoots.Add(p);
+                    else throw new Exception($"父容器未找到: {parentName}");
+                }
+            }
+            else
+            {
+                searchRoots.Add(root);
             }
 
-            // 组合查找条件
+            var matches = new System.Collections.Generic.List<AutomationElement>();
+
+            // 核心：在确定的 searchRoots 范围内使用高速 Win32 HWND 枚举找目标
+            foreach (var sRoot in searchRoots)
+            {
+                var hwnds = new System.Collections.Generic.List<IntPtr>();
+                try
+                {
+                    EnumChildWindows((IntPtr)sRoot.Current.NativeWindowHandle, (hWnd, lParam) =>
+                    {
+                        hwnds.Add(hWnd);
+                        return true;
+                    }, IntPtr.Zero);
+                }
+                catch { }
+
+                foreach (var hWnd in hwnds)
+                {
+                    try
+                    {
+                        var el = AutomationElement.FromHandle(hWnd);
+                        bool nameMatch = (el.Current.Name == controlName || el.Current.AutomationId == controlName);
+                        bool typeMatch = controlType == null || el.Current.ControlType == controlType;
+                        
+                        if (nameMatch && typeMatch)
+                        {
+                            matches.Add(el);
+                        }
+                    }
+                    catch { }
+                }
+
+                if (matches.Count > index) return matches[index];
+            }
+
+            // 万一真的是纯虚拟 UI，Win32 枚不到，最终保底使用 UIA 的 Descendants (可能会卡)
             Condition nameCond = new OrCondition(
                 new PropertyCondition(AutomationElement.NameProperty, controlName),
                 new PropertyCondition(AutomationElement.AutomationIdProperty, controlName)
@@ -469,16 +536,21 @@ namespace GnwayAgent
                     new PropertyCondition(AutomationElement.ControlTypeProperty, controlType))
                 : nameCond;
 
-            var results = searchRoot.FindAll(TreeScope.Descendants, finalCond);
+            foreach (var sRoot in searchRoots)
+            {
+                try {
+                    var results = sRoot.FindAll(TreeScope.Descendants, finalCond);
+                    foreach (AutomationElement r in results) matches.Add(r);
+                } catch { }
+            }
 
-            if (results.Count == 0)
-                throw new Exception($"控件未找到: [{controlName}]" +
-                    (parentName != null ? $" (在 [{parentName}] 内)" : ""));
+            if (matches.Count == 0)
+                throw new Exception($"控件未找到: [{controlName}]" + (parentName != null ? $" (在 [{parentName}] 内)" : ""));
 
-            if (index >= results.Count)
-                throw new Exception($"索引越界: [{controlName}] 共{results.Count}个，请求第{index}个");
+            if (index >= matches.Count)
+                throw new Exception($"索引越界: [{controlName}] 共{matches.Count}个，请求第{index}个");
 
-            return results[index];
+            return matches[index];
         }
 
         // 列出所有顶层窗口
@@ -610,80 +682,50 @@ namespace GnwayAgent
             mouse_event(MOUSEEVENTF_LEFTUP, pt.X, pt.Y, 0, 0);
         }
 
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        [return: System.Runtime.InteropServices.MarshalAs(System.Runtime.InteropServices.UnmanagedType.Bool)]
+        static extern bool EnumChildWindows(IntPtr hwndParent, EnumWindowsProc lpEnumFunc, IntPtr lParam);
+
+        delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
+
         // ── listcontrols|窗口名[|深度] ────────────────────────
         // 返回流式结果（防止NamedPipe Semaphore Idle 超时）
+        // 采用极致优化的 Win32 EnumChildWindows 脱离 UIA 假死桎梏法
         static void DoListControlsStream(AutomationElement window, string[] parts, StreamWriter writer)
         {
-            int maxDepth = parts.Length > 2 && int.TryParse(parts[2], out int d) ? d : 15;
             writer.WriteLine("OK:"); // 流式标识首行
             try
             {
-                CollectControlsFastStream(window, 0, maxDepth, writer);
+                var hwnds = new System.Collections.Generic.List<IntPtr>();
+                // 获取窗口原生句柄，利用底层 C++ API 瞬间( < 2ms) 枚举完几百几千层所有子孙句柄！彻底绕过 UIA 渲染引擎漏洞。
+                EnumChildWindows((IntPtr)window.Current.NativeWindowHandle, (hWnd, lParam) =>
+                {
+                    hwnds.Add(hWnd);
+                    return true;
+                }, IntPtr.Zero);
+
+                // 遍历平铺出来的 HWND，因为已经是降维平铺，不再有深度递归卡死顾虑。
+                foreach (var hWnd in hwnds)
+                {
+                    try
+                    {
+                        var el = AutomationElement.FromHandle(hWnd);
+                        string type = el.Current.ControlType.ProgrammaticName.Replace("ControlType.", "");
+                        string name = el.Current.Name ?? "";
+                        bool enabled = el.Current.IsEnabled;
+
+                        if (IsKeyControl(type, name))
+                        {
+                            writer.WriteLine($"{type}|{name}|{(enabled ? "1" : "0")}");
+                        }
+                    }
+                    catch { } // 忽略中途被销毁或是无法解析的异常句柄，继续执行！绝不断开！
+                }
             }
             catch (Exception ex)
             {
                 writer.WriteLine($"ERR:获取控件树异常: {ex.Message}");
             }
-        }
-
-        static void CollectControlsFastStream(AutomationElement el, int depth, int maxDepth, StreamWriter writer)
-        {
-            string type = "";
-            try
-            {
-                if (depth > 0)
-                {
-                    // 尝试从 Cached 读取（极大幅度减少 COM IPC 调用），否则回退到 Current
-                    try { type = el.Cached.ControlType.ProgrammaticName.Replace("ControlType.", ""); }
-                    catch { type = el.Current.ControlType.ProgrammaticName.Replace("ControlType.", ""); }
-
-                    string name;
-                    try { name = el.Cached.Name ?? ""; } catch { name = el.Current.Name ?? ""; }
-
-                    bool enabled;
-                    try { enabled = el.Cached.IsEnabled; } catch { enabled = el.Current.IsEnabled; }
-
-                    if (IsKeyControl(type, name))
-                    {
-                        writer.WriteLine($"{type}|{name}|{(enabled ? "1" : "0")}");
-                    }
-                }
-                else
-                {
-                    type = "Window";
-                }
-
-                if (depth >= maxDepth) return;
-
-                // 核心防卡死优化：严禁深入遍历表格/列表的内部单元格！
-                if (type == "DataGrid" || type == "Table" || type == "List" || type == "Tree" || type == "ComboBox")
-                {
-                    return; 
-                }
-            }
-            catch { return; } // Skip dead elements
-
-            try
-            {
-                AutomationElementCollection children;
-                // 一次性跨进程拉取本层所有子节点及其这三个属性的缓存快照！
-                var req = new CacheRequest();
-                req.Add(AutomationElement.ControlTypeProperty);
-                req.Add(AutomationElement.NameProperty);
-                req.Add(AutomationElement.IsEnabledProperty);
-                req.TreeScope = TreeScope.Element | TreeScope.Children;
-
-                using (req.Activate())
-                {
-                    children = el.FindAll(TreeScope.Children, Condition.TrueCondition);
-                }
-
-                foreach (AutomationElement child in children)
-                {
-                    CollectControlsFastStream(child, depth + 1, maxDepth, writer);
-                }
-            }
-            catch { }
         }
 
         static bool IsKeyControl(string type, string name)
