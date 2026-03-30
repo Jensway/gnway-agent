@@ -33,11 +33,11 @@ def main():
         pipe = None
         try:
             # 创建命名管道
-            # 等同于 C# NamedPipeServerStream(PIPE_NAME, PipeDirection.InOut, 1, PipeTransmissionMode.Message, PipeOptions.None)
             pipe = win32pipe.CreateNamedPipe(
                 PIPE_NAME,
                 win32pipe.PIPE_ACCESS_DUPLEX,
-                win32pipe.PIPE_TYPE_MESSAGE | win32pipe.PIPE_READMODE_MESSAGE | win32pipe.PIPE_WAIT,
+                # 使用字节模式而非消息模式，以接受 C# 客户端的多次 Flush 流数据
+                win32pipe.PIPE_TYPE_BYTE | win32pipe.PIPE_READMODE_BYTE | win32pipe.PIPE_WAIT,
                 1,              # 实例数
                 65536,          # 输出缓冲区
                 65536,          # 输入缓冲区
@@ -50,13 +50,22 @@ def main():
             print("[连接] 客户端已连接")
 
             try:
-                # 读取消息
-                hr, data = win32file.ReadFile(pipe, 65536)
-                if hr == 0 and data:
-                    # 解码命令，移除末尾换行符。使用 utf-8-sig 会自动跳过 C# StreamWriter 强加的 BOM 头 (\xef\xbb\xbf)
+                # 循环读取直到遇到换行符，防范 C# 的 StreamWriter.AutoFlush 将 BOM 和实际字符串分多次发来
+                chunks = []
+                while True:
+                    hr, chunk = win32file.ReadFile(pipe, 4096)
+                    if not chunk:
+                        break
+                    chunks.append(chunk)
+                    if b'\n' in chunk:
+                        break
+                
+                data = b''.join(chunks)
+                if data:
                     cmd_line = data.decode('utf-8-sig').strip()
                     if not cmd_line:
                         win32file.WriteFile(pipe, "ERR:空命令\r\n".encode('utf-8'))
+                        print("[跳过] 收到空字符或独立 BOM 测试连接")
                         continue
 
                     print(f"[收到] {cmd_line}")
