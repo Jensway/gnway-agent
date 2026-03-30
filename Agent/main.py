@@ -53,8 +53,8 @@ def main():
                 # 读取消息
                 hr, data = win32file.ReadFile(pipe, 65536)
                 if hr == 0 and data:
-                    # 解码命令，移除末尾换行符
-                    cmd_line = data.decode('utf-8').strip()
+                    # 解码命令，移除末尾换行符。使用 utf-8-sig 会自动跳过 C# StreamWriter 强加的 BOM 头 (\xef\xbb\xbf)
+                    cmd_line = data.decode('utf-8-sig').strip()
                     if not cmd_line:
                         win32file.WriteFile(pipe, "ERR:空命令\r\n".encode('utf-8'))
                         continue
