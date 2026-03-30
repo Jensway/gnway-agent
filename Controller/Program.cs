@@ -1,9 +1,5 @@
-// ============================================================
-//  Program.cs — 应用入口，带全局异常捕获
-//  出错时弹 MessageBox，不再静默消失
-// ============================================================
-
 using System;
+using System.IO;
 using System.Windows.Forms;
 
 namespace GnwayController
@@ -13,26 +9,46 @@ namespace GnwayController
         [STAThread]
         static void Main()
         {
-            // 捕获所有未处理异常，弹窗显示而不是静默退出
+            // ── 全局异常捕获：崩溃时弹窗 + 写日志，绝不静默消失 ──
             Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
 
             Application.ThreadException += (s, e) =>
-                MessageBox.Show(
-                    $"运行时错误：\n{e.Exception.Message}\n\n{e.Exception.StackTrace}",
-                    "GnwayAgent 错误",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Error);
+                ShowCrash("UI线程异常", e.Exception);
 
             AppDomain.CurrentDomain.UnhandledException += (s, e) =>
-                MessageBox.Show(
-                    $"严重错误：\n{((Exception)e.ExceptionObject)}",
-                    "GnwayAgent 严重错误",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Error);
+                ShowCrash("未处理异常", (Exception)e.ExceptionObject);
 
-            Application.EnableVisualStyles();
-            Application.SetCompatibleTextRenderingDefault(false);
-            Application.Run(new MainForm());
+            try
+            {
+                Application.EnableVisualStyles();
+                Application.SetCompatibleTextRenderingDefault(false);
+                Application.Run(new MainForm());
+            }
+            catch (Exception ex)
+            {
+                ShowCrash("启动失败", ex);
+            }
+        }
+
+        static void ShowCrash(string title, Exception ex)
+        {
+            // 写日志文件（exe 同目录）
+            try
+            {
+                string logPath = Path.Combine(
+                    AppDomain.CurrentDomain.BaseDirectory, "crash.log");
+                File.WriteAllText(logPath,
+                    $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] {title}\n{ex}\n");
+            }
+            catch { /* 写日志本身失败则忽略 */ }
+
+            MessageBox.Show(
+                $"{title}：\n\n{ex.Message}\n\n详情已写入 crash.log",
+                "GnwayAgent 启动错误",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Error);
+
+            Environment.Exit(1);
         }
     }
 }
