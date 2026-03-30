@@ -369,14 +369,16 @@ def do_listcontrols_stream(window, pipe):
         # 使用底层 win32 枚举极大加速。直接使用 EnumChildWindows 平铺句柄
         def callback(hwnd, extra):
             try:
-                # 转为 pywinauto 对象
-                w = pywinauto.controls.uiawallet.UIAElementInfo(hwnd)
-                ct = w.control_type
+                # 修正：正确的 pywinauto 导入路径
+                from pywinauto.uia_element_info import UIAElementInfo
+                w = UIAElementInfo(hwnd)
+                ct = w.control_type or "Custom"
                 name = w.name or ""
                 enabled = 1 if w.enabled else 0
                 if is_key_control(ct, name):
                     write_pipe_stream(pipe, f"{ct}|{name}|{enabled}")
-            except:
+            except Exception:
+                # 若提取单独 hwnd 时异常，忽略它，不拖累整个流
                 pass
             return True
             
