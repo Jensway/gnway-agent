@@ -158,18 +158,20 @@ namespace GnwayController
             toolbar.Controls.Add(_lblConn);
 
             // ── 主体 — SplitContainer ─────────────────────────
+            // 注意：Panel2MinSize 和 SplitterDistance 不能在初始化器中设置，
+            // 因为控件布局前 Width=0，任何约束校验都会抛出 InvalidOperationException。
+            // 必须延迟到 Load 事件后（窗体已显示、Width 已确定）再赋值。
             var splitter = new SplitContainer
             {
                 Dock          = DockStyle.Fill,
                 SplitterWidth = 6,
                 BackColor     = C_BG,
                 Orientation   = Orientation.Vertical,
-                Panel1MinSize = 160,
-                Panel2MinSize = 200   // 初始化阶段使用较小值，避免约束冲突
+                Panel1MinSize = 160
             };
             Controls.Add(splitter);
             splitter.BringToFront();
-            // 待窗体布局完成后再设置实际分隔位置和最小尺寸
+            // 窗体 Load 后再设置分隔位置和右侧最小宽度
             this.Load += (_, __) =>
             {
                 splitter.Panel2MinSize    = 300;
