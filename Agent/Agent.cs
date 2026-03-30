@@ -23,7 +23,6 @@ namespace GnwayAgent
     class Agent
     {
         const string PIPE_NAME = "GnwayAgentPipe";
-        static bool UseUiaEngine = false; // 双发引擎切换开关
 
         static void Main(string[] args)
         {
@@ -127,20 +126,12 @@ namespace GnwayAgent
                             Console.WriteLine($"\n[提示] 写入 txt 失败: {ex.Message}");
                         }
 
-                        Console.WriteLine("====================================================\n输入 'm' 刷新窗口列表，或按 's' 切换引擎。");
+                        Console.WriteLine("====================================================\n输入 'm' 刷新窗口列表，或直接输入编号/测试动作。");
                     }
                     else
                     {
                         Console.WriteLine(">>> 编号无效，请对照上方列表重新输入，或按 'm' 重新唤出列表。");
                     }
-                    continue;
-                }
-
-                if (input.Trim().ToLower() == "s")
-                {
-                    UseUiaEngine = !UseUiaEngine;
-                    Console.WriteLine($"\n[引擎已切换] 当前扫描引擎: {(UseUiaEngine ? "UIA 全量深度扫描引擎 (防漏/最全面但稍慢)" : "Win32 原生平铺引擎 (极速防卡死)")}");
-                    PrintMenu();
                     continue;
                 }
 
@@ -199,10 +190,10 @@ namespace GnwayAgent
             }
             Console.WriteLine("==================================");
             Console.WriteLine("请直接输入上方窗口前对应的【数字】（如 1 或 2）并按回车。");
-            Console.WriteLine("Agent 将直接打印该窗口的所有底层 Win32 控件结构。");
-            Console.WriteLine($"若窗口未显示，请按 'm' 键刷新列表。目前引擎: [{(UseUiaEngine ? "UIA全量" : "Win32极速")}] (按 's' 切换)");
+            Console.WriteLine("Agent 将应用统一全能引擎打印该窗口的所有底层 Win32 与 UIA 控件结构。");
+            Console.WriteLine("若窗口未显示，请按 'm' 键刷新列表。");
             Console.WriteLine("网络客户端 NamedPipe 也仍在后台静默监听，随时可连接。");
-            Console.Write("\n请输入数字或指令 (s切换引擎/m刷新): ");
+            Console.Write("\n请输入数字或指令 (如: m): ");
         }
 
         // =====================================================
@@ -851,78 +842,10 @@ namespace GnwayAgent
             writer.WriteLine("OK:"); // 流式标识首行
             try
             {
-                if (UseUiaEngine)
-                {
-                    WalkUiaTree(window, writer);
-                    return;
-                }
-
-                // == Win32 极速平铺引擎 ==
-                var hwnds = new System.Collections.Generic.List<IntPtr>();
-                IntPtr rootNative = (IntPtr)window.Current.NativeWindowHandle;
-
-                EnumChildWindows(rootNative, (hWnd, lParam) =>
-                {
-                    hwnds.Add(hWnd);
-                    return true;
-                }, IntPtr.Zero);
-
-                int GetDepth(IntPtr h)
-                {
-                    int d = 0;
-                    IntPtr p = GetParent(h);
-                    while (p != IntPtr.Zero && p != rootNative && d < 20)
-                    {
-                        d++;
-                        p = GetParent(p);
-                    }
-                    return d + 1;
-                }
-
-                // 完全放弃 UIA 转换，直接使用 Win32 API 瞬间提纯全屏文本与类型 (极速 0ms，杜绝任何假死报错)
-                foreach (var hWnd in hwnds)
-                {
-                    try
-                    {
-                        var sbClass = new StringBuilder(256);
-                        GetClassName(hWnd, sbClass, sbClass.Capacity);
-                        string cls = sbClass.ToString();
-
-                        var sbText = new StringBuilder(256);
-                        GetWindowText(hWnd, sbText, sbText.Capacity);
-                        string name = sbText.ToString();
-
-                        bool enabled = IsWindowEnabled(hWnd);
-                        bool visible = IsWindowVisible(hWnd);
-
-                        string type = "Custom";
-                        string cl = cls.ToLower();
-                        if (cl.Contains("button") || cl.Contains("btn")) type = "Button";
-                        else if (cl.Contains("checkbox") || cl.Contains("check")) type = "CheckBox";
-                        else if (cl.Contains("radio")) type = "RadioButton";
-                        else if (cl.Contains("edit")) type = "Edit";
-                        else if (cl.Contains("combo")) type = "ComboBox";
-                        else if (cl.Contains("listview") || cl.Contains("listbox") || cl.Contains("list")) type = "List";
-                        else if (cl.Contains("grid") || cl.Contains("table") || cl.Contains("stringgrid")) type = "DataGrid";
-                        else if (cl.Contains("tree")) type = "Tree";
-                        else if (cl.Contains("scrollbar")) type = "ScrollBar";
-                        else if (cl.Contains("tab")) type = "TabItem";
-                        else if (cl.Contains("menu")) type = "MenuItem";
-                        else if (cl.Contains("static") || cl.Contains("label") || cl.Contains("text")) type = "Text";
-                        else if (cl.Contains("slider") || cl.Contains("trackbar")) type = "Slider";
-                        else if (cl.Contains("spin") || cl.Contains("updown")) type = "Spinner";
-
-                        int depth = GetDepth(hWnd);
-                        string pad = new string('-', depth * 2) + " ";
-
-                        string displayName = string.IsNullOrWhiteSpace(name) ? "[无文字]" : name;
-                        displayName = $"{pad}{displayName} [类:{cls}]";
-                        if (!visible) displayName += " {隐}";
-
-                        writer.WriteLine($"{type}|{displayName}|{(enabled ? "1" : "0")}");
-                    }
-                    catch { } // 忽略安全异常
-                }
+                // == 统一全能引擎 (Unified Engine) ==
+                // 结合 Win32 的极速执行与 UIA 的完整感知，我们在这里使用 RawViewWalker 获取 100% 全量元素。
+                // 摒弃了会造成死锁的 FindAll()。
+                WalkUnifiedTree(window, writer, 1);
             }
             catch (Exception ex)
             {
@@ -930,9 +853,10 @@ namespace GnwayAgent
             }
         }
 
-        static void WalkUiaTree(AutomationElement el, TextWriter writer, int depth = 1)
+        static void WalkUnifiedTree(AutomationElement el, TextWriter writer, int depth = 1)
         {
-            var walker = TreeWalker.ControlViewWalker;
+            // 使用 RawViewWalker 可确保即使是没有名字、但占据核心排版位置的 Win32 或 WPF 隐藏容器也绝不遗漏
+            var walker = TreeWalker.RawViewWalker;
             var child = walker.GetFirstChild(el);
             while (child != null)
             {
@@ -941,20 +865,26 @@ namespace GnwayAgent
                     string type = child.Current.ControlType.ProgrammaticName.Replace("ControlType.", "");
                     string name = child.Current.Name ?? "";
                     string aid  = child.Current.AutomationId ?? "";
+                    string cls  = child.Current.ClassName ?? "";
                     bool enabled = child.Current.IsEnabled;
                     bool visible = !child.Current.IsOffscreen;
 
                     string display = string.IsNullOrWhiteSpace(name) ? "[无名]" : name;
+                    
                     if (!string.IsNullOrWhiteSpace(aid) && aid != name)
                         display += $" (ID:{aid})";
+                    
+                    if (!string.IsNullOrWhiteSpace(cls))
+                        display += $" [类:{cls}]";
+                        
                     if (!visible)
-                        display += " {不可见}";
+                        display += " {隐}";
 
                     string pad = new string('-', depth * 2) + " ";
                     writer.WriteLine($"{type}|{pad}{display}|{(enabled ? "1" : "0")}");
                     
                     // 递归步进遍历，生成树状分支
-                    WalkUiaTree(child, writer, depth + 1);
+                    WalkUnifiedTree(child, writer, depth + 1);
                 }
                 catch { } // 忽略中途失效的组件
 
