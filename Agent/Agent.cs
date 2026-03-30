@@ -839,6 +839,13 @@ namespace GnwayAgent
         [return: System.Runtime.InteropServices.MarshalAs(System.Runtime.InteropServices.UnmanagedType.Bool)]
         static extern bool IsWindowEnabled(IntPtr hWnd);
 
+        [System.Runtime.InteropServices.DllImport("user32.dll", ExactSpelling = true, CharSet = System.Runtime.InteropServices.CharSet.Auto)]
+        public static extern IntPtr GetParent(IntPtr hWnd);
+
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        [return: System.Runtime.InteropServices.MarshalAs(System.Runtime.InteropServices.UnmanagedType.Bool)]
+        static extern bool IsWindowVisible(IntPtr hWnd);
+
         static void DoListControlsStream(AutomationElement window, string[] parts, TextWriter writer)
         {
             writer.WriteLine("OK:"); // 流式标识首行
@@ -852,11 +859,25 @@ namespace GnwayAgent
 
                 // == Win32 极速平铺引擎 ==
                 var hwnds = new System.Collections.Generic.List<IntPtr>();
-                EnumChildWindows((IntPtr)window.Current.NativeWindowHandle, (hWnd, lParam) =>
+                IntPtr rootNative = (IntPtr)window.Current.NativeWindowHandle;
+
+                EnumChildWindows(rootNative, (hWnd, lParam) =>
                 {
                     hwnds.Add(hWnd);
                     return true;
                 }, IntPtr.Zero);
+
+                int GetDepth(IntPtr h)
+                {
+                    int d = 0;
+                    IntPtr p = GetParent(h);
+                    while (p != IntPtr.Zero && p != rootNative && d < 20)
+                    {
+                        d++;
+                        p = GetParent(p);
+                    }
+                    return d + 1;
+                }
 
                 // 完全放弃 UIA 转换，直接使用 Win32 API 瞬间提纯全屏文本与类型 (极速 0ms，杜绝任何假死报错)
                 foreach (var hWnd in hwnds)
@@ -872,6 +893,7 @@ namespace GnwayAgent
                         string name = sbText.ToString();
 
                         bool enabled = IsWindowEnabled(hWnd);
+                        bool visible = IsWindowVisible(hWnd);
 
                         string type = "Custom";
                         string cl = cls.ToLower();
@@ -890,8 +912,13 @@ namespace GnwayAgent
                         else if (cl.Contains("slider") || cl.Contains("trackbar")) type = "Slider";
                         else if (cl.Contains("spin") || cl.Contains("updown")) type = "Spinner";
 
-                        // 不再利用 IsKeyControl 过滤任何数据，哪怕没名字，只要是控件都展示，附带底层类名帮助确认真实身份
-                        string displayName = string.IsNullOrEmpty(name) ? $"[类名:{cls}]" : $"{name} [类名:{cls}]";
+                        int depth = GetDepth(hWnd);
+                        string pad = new string('-', depth * 2) + " ";
+
+                        string displayName = string.IsNullOrWhiteSpace(name) ? "[无文字]" : name;
+                        displayName = $"{pad}{displayName} [类:{cls}]";
+                        if (!visible) displayName += " {隐}";
+
                         writer.WriteLine($"{type}|{displayName}|{(enabled ? "1" : "0")}");
                     }
                     catch { } // 忽略安全异常
@@ -903,7 +930,7 @@ namespace GnwayAgent
             }
         }
 
-        static void WalkUiaTree(AutomationElement el, TextWriter writer)
+        static void WalkUiaTree(AutomationElement el, TextWriter writer, int depth = 1)
         {
             var walker = TreeWalker.ControlViewWalker;
             var child = walker.GetFirstChild(el);
@@ -913,12 +940,21 @@ namespace GnwayAgent
                 {
                     string type = child.Current.ControlType.ProgrammaticName.Replace("ControlType.", "");
                     string name = child.Current.Name ?? "";
+                    string aid  = child.Current.AutomationId ?? "";
                     bool enabled = child.Current.IsEnabled;
+                    bool visible = !child.Current.IsOffscreen;
+
+                    string display = string.IsNullOrWhiteSpace(name) ? "[无名]" : name;
+                    if (!string.IsNullOrWhiteSpace(aid) && aid != name)
+                        display += $" (ID:{aid})";
+                    if (!visible)
+                        display += " {不可见}";
+
+                    string pad = new string('-', depth * 2) + " ";
+                    writer.WriteLine($"{type}|{pad}{display}|{(enabled ? "1" : "0")}");
                     
-                    writer.WriteLine($"{type}|{name}|{(enabled ? "1" : "0")}");
-                    
-                    // 递归步进遍历，这种老式的深度先序遍历可以防止 .FindAll() 大平铺时的底层 IPC 超时崩溃
-                    WalkUiaTree(child, writer);
+                    // 递归步进遍历，生成树状分支
+                    WalkUiaTree(child, writer, depth + 1);
                 }
                 catch { } // 忽略中途失效的组件
 
