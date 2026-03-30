@@ -628,10 +628,7 @@ namespace GnwayAgent
                     string name    = el.Current.Name ?? "";
                     bool   enabled = el.Current.IsEnabled;
 
-                    bool isContainer = (type == "Pane" || type == "Document" || type == "Group" || type == "Window")
-                                       && string.IsNullOrEmpty(name);
-                                       
-                    if (!isContainer && type != "ScrollBar")
+                    if (IsKeyControl(type, name))
                     {
                         sb.AppendLine($"{type}|{name}|{(enabled ? "1" : "0")}");
                     }
@@ -665,6 +662,35 @@ namespace GnwayAgent
                 }
             }
             catch { }
+        }
+
+        static bool IsKeyControl(string type, string name)
+        {
+            switch (type)
+            {
+                case "Button":
+                case "CheckBox":
+                case "RadioButton":
+                case "Edit":
+                case "ComboBox":
+                case "List":
+                case "DataGrid":
+                case "Table":
+                case "Tree":
+                case "ScrollBar":
+                case "TabItem":
+                case "MenuItem":
+                case "Slider":
+                case "Spinner":
+                case "Thumb":
+                    return true;
+                case "Text":
+                case "Document":
+                    return !string.IsNullOrWhiteSpace(name);
+                default:
+                    // 容器层（如 Pane, Group 等），仅保留具有名字的，过滤无意义的纯嵌套壳
+                    return !string.IsNullOrWhiteSpace(name);
+            }
         }
 
         // ── gridrows|窗口名|控件名[|最大行数] ─────────────────
