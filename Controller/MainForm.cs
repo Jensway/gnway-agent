@@ -456,8 +456,8 @@ namespace GnwayController
             _treeData.Clear();
 
             string server = _tbServer.Text.Trim();
-            var client = new AgentClient(server, timeoutMs: 15000);
-            string result = await Task.Run(() => client.Send($"listcontrols|{win}"));
+            var client = new AgentClient(server, timeoutMs: 30000);
+            string result = await Task.Run(() => client.Send($"listcontrols|{win}|10"));
 
             _btnRefresh.Enabled = true;
 
