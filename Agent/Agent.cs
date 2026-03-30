@@ -94,6 +94,10 @@ namespace GnwayAgent
                 if (action == "windows")
                     return ListAllWindows();
 
+                // snapshot：机器可读的窗口列表，用于状态感知
+                if (action == "snapshot")
+                    return DoSnapshot();
+
                 if (parts.Length < 2)
                     return "ERR:参数不足（格式: 动作|程序名|...）";
 
@@ -107,6 +111,10 @@ namespace GnwayAgent
                         ?? throw new Exception($"找不到窗口: {appTitle}");
                     return DumpTree(win, depth);
                 }
+
+                // windowexists：不需要窗口存在，专门检查窗口是否存在
+                if (action == "windowexists")
+                    return FindWindow(appTitle) != null ? "OK:true" : "OK:false";
 
                 // 以下动作都需要找到窗口
                 var window = FindWindow(appTitle)
@@ -123,6 +131,8 @@ namespace GnwayAgent
                     "exists"      => DoExists(window, parts),
                     "select"      => DoSelect(window, parts),
                     "focus"       => DoFocus(window, parts),
+                    "isenabled"   => DoIsEnabled(window, parts),
+                    "popupinfo"   => DoPopupInfo(window, parts),
                     _             => $"ERR:未知动作 [{action}]"
                 };
             }
@@ -503,6 +513,73 @@ namespace GnwayAgent
                 DumpNode(child, depth + 1, maxDepth, sb);
                 child = walker.GetNextSibling(child);
             }
+        }
+
+        // ── 检查控件是否启用 ──────────────────────────────
+        // isenabled|程序名|控件名
+        static string DoIsEnabled(AutomationElement window, string[] parts)
+        {
+            string controlName = parts[2];
+            var ctrl = FindControl(window, controlName);
+            return ctrl.Current.IsEnabled ? "OK:true" : "OK:false";
+        }
+
+        // ── 读取弹窗完整信息（标题+正文+按钮）──────────────
+        // popupinfo|程序名  →  OK:title=xxx|body=xxx|buttons=确定,取消
+        static string DoPopupInfo(AutomationElement window, string[] parts)
+        {
+            var texts   = new System.Collections.Generic.List<string>();
+            var buttons = new System.Collections.Generic.List<string>();
+            CollectPopupContent(window, texts, buttons);
+
+            // 去重并过滤标题自身（标题已在 title= 字段）
+            string title = window.Current.Name;
+            texts.Remove(title);
+
+            string body = string.Join(" ", texts.FindAll(t => !string.IsNullOrWhiteSpace(t)));
+            string btns = string.Join(",", buttons.FindAll(b => !string.IsNullOrWhiteSpace(b)));
+            return $"OK:title={title}|body={body}|buttons={btns}";
+        }
+
+        static void CollectPopupContent(
+            AutomationElement el,
+            System.Collections.Generic.List<string> texts,
+            System.Collections.Generic.List<string> buttons)
+        {
+            var type = el.Current.ControlType;
+            string name = el.Current.Name ?? "";
+
+            if ((type == ControlType.Text || type == ControlType.Custom)
+                && !string.IsNullOrWhiteSpace(name))
+                texts.Add(name.Trim());
+
+            if (type == ControlType.Button && !string.IsNullOrWhiteSpace(name))
+                buttons.Add(name.Trim());
+
+            var walker = TreeWalker.ControlViewWalker;
+            var child  = walker.GetFirstChild(el);
+            while (child != null)
+            {
+                CollectPopupContent(child, texts, buttons);
+                child = walker.GetNextSibling(child);
+            }
+        }
+
+        // ── 快照：返回所有可见窗口名（|||分隔）──────────────
+        // snapshot  →  OK:窗口A|||窗口B|||窗口C
+        static string DoSnapshot()
+        {
+            var all = AutomationElement.RootElement.FindAll(
+                TreeScope.Children, Condition.TrueCondition);
+
+            var names = new System.Collections.Generic.List<string>();
+            foreach (AutomationElement e in all)
+            {
+                string n = e.Current.Name ?? "";
+                if (!string.IsNullOrEmpty(n) && !e.Current.IsOffscreen)
+                    names.Add(n);
+            }
+            return "OK:" + string.Join("|||", names);
         }
 
         // 模拟鼠标左键点击（兜底方案）

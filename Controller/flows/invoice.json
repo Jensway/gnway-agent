@@ -1,0 +1,131 @@
+{
+  "name": "发票自动化",
+  "maxRounds": 200,
+  "states": [
+    {
+      "id": "check_list",
+      "label": "检查未处理发票",
+      "startState": true,
+      "waitFor": { "type": "windowExists", "window": "发票管理" },
+      "timeoutSec": 30,
+      "onTimeout": "ERROR",
+      "transitions": [
+        {
+          "condition": { "type": "controlExists", "window": "发票管理", "control": "未处理" },
+          "actions": [
+            { "cmd": "click|发票管理|未处理" },
+            { "sleep": 400 },
+            { "cmd": "click|发票管理|生成" }
+          ],
+          "next": "wait_detail"
+        },
+        {
+          "condition": { "type": "controlNotExists", "window": "发票管理", "control": "未处理" },
+          "actions": [],
+          "next": "DONE"
+        }
+      ]
+    },
+
+    {
+      "id": "wait_detail",
+      "label": "等待发票详情窗口",
+      "waitFor": { "type": "windowExists", "window": "发票详情" },
+      "timeoutSec": 60,
+      "onTimeout": "ERROR",
+      "transitions": [
+        {
+          "condition": { "type": "windowExists", "window": "发票详情" },
+          "actions": [
+            { "sleep": 500 },
+            { "cmd": "click|发票详情|保存" }
+          ],
+          "next": "wait_audit_enabled"
+        }
+      ]
+    },
+
+    {
+      "id": "wait_audit_enabled",
+      "label": "等待审核按钮激活",
+      "waitFor": { "type": "controlEnabled", "window": "发票详情", "control": "审核" },
+      "timeoutSec": 30,
+      "onTimeout": "ERROR",
+      "transitions": [
+        {
+          "condition": { "type": "controlEnabled", "window": "发票详情", "control": "审核" },
+          "actions": [
+            { "sleep": 300 },
+            { "cmd": "click|发票详情|审核" }
+          ],
+          "next": "handle_audit_popup"
+        }
+      ]
+    },
+
+    {
+      "id": "handle_audit_popup",
+      "label": "处理审核结果弹窗",
+      "waitFor": { "type": "anyPopup" },
+      "timeoutSec": 30,
+      "onTimeout": "ERROR",
+      "transitions": [
+        {
+          "condition": { "type": "popupBodyContains", "text": "成功" },
+          "actions": [ { "cmd": "popupclick|confirm" } ],
+          "next": "check_jiuji"
+        },
+        {
+          "condition": { "type": "popupBodyContains", "text": "失败" },
+          "actions": [ { "cmd": "popupclick|confirm" } ],
+          "next": "ERROR"
+        },
+        {
+          "condition": { "type": "popupBodyContains", "text": "已存在" },
+          "actions": [ { "cmd": "popupclick|cancel" } ],
+          "next": "exit_detail"
+        },
+        {
+          "condition": { "type": "always" },
+          "actions": [ { "cmd": "popupclick|confirm" } ],
+          "next": "check_jiuji"
+        }
+      ]
+    },
+
+    {
+      "id": "check_jiuji",
+      "label": "检查勾稽成功弹窗",
+      "waitFor": { "type": "anyPopup" },
+      "timeoutSec": 10,
+      "onTimeout": "exit_detail",
+      "transitions": [
+        {
+          "condition": { "type": "popupBodyContains", "text": "勾稽" },
+          "actions": [ { "cmd": "popupclick|confirm" } ],
+          "next": "exit_detail"
+        },
+        {
+          "condition": { "type": "always" },
+          "actions": [ { "cmd": "popupclick|confirm" } ],
+          "next": "exit_detail"
+        }
+      ]
+    },
+
+    {
+      "id": "exit_detail",
+      "label": "退出详情返回列表",
+      "transitions": [
+        {
+          "condition": { "type": "always" },
+          "actions": [
+            { "cmd": "click|发票详情|退出", "fallback": "click|发票详情|关闭" },
+            { "sleep": 800 }
+          ],
+          "next": "check_list"
+        }
+      ]
+    }
+  ]
+}
