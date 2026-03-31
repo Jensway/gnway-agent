@@ -726,14 +726,15 @@ namespace GnwayAgent
                 int index = 1;
                 foreach (AutomationElement el in allElements)
                 {
+                    if (!IsValidUiaButton(el)) continue;
+                    
                     var ct = el.Current.ControlType;
-                    if (ct == ControlType.ToolBar || ct == ControlType.Pane || ct == ControlType.Window) continue;
                     string text = el.Current.Name ?? "";
                     string magicId = $"<UIA_{parentMagicId}_BTN{index}>";
                     bool enabled = el.Current.IsEnabled;
                     var rect = el.Current.BoundingRectangle;
                     int w = (int)rect.Width;
-                    string displayRect = w > 0 ? $"[{(int)rect.Left},{(int)rect.Top} Width:{w}]" : "";
+                    string displayRect = $"[{(int)rect.Left},{(int)rect.Top} Width:{w}]";
                     string typeName = $"UIA_{ct.ProgrammaticName.Replace("ControlType.", "")}";
                     writer.WriteLine($"{typeName}|{depth}|{magicId}|{text}|{displayRect}|{(enabled ? "1" : "0")}");
                     Console.WriteLine($"    [{index}] {typeName}: {text}");
@@ -742,6 +743,29 @@ namespace GnwayAgent
                 if (index == 1) Console.WriteLine($"  [UIA] 无虚拟按钮");
             }
             catch (Exception ex) { Console.WriteLine($"  [UIA异常] {ex.Message}"); }
+        }
+
+        static bool IsValidUiaButton(AutomationElement el)
+        {
+            var ct = el.Current.ControlType;
+            if (ct == ControlType.ToolBar || ct == ControlType.Pane || ct == ControlType.Window) return false;
+            
+            bool isInteractive = (ct == ControlType.Button || ct == ControlType.MenuItem ||
+                                  ct == ControlType.SplitButton || ct == ControlType.Custom ||
+                                  ct == ControlType.Tab || ct == ControlType.TabItem ||
+                                  ct == ControlType.Hyperlink || ct == ControlType.Image ||
+                                  ct == ControlType.ListItem || ct == ControlType.TreeItem);
+            if (!isInteractive) return false;
+
+            try
+            {
+                if (el.Current.IsOffscreen) return false;
+                var rect = el.Current.BoundingRectangle;
+                if (rect.Width <= 0 || rect.Height <= 0) return false;
+            }
+            catch { return false; }
+
+            return true;
         }
 
         static AutomationElement FindUiaVirtualControl(IntPtr window, string controlName)
@@ -762,13 +786,7 @@ namespace GnwayAgent
             int curIdx = 1;
             foreach (AutomationElement el in allElements)
             {
-                var ct = el.Current.ControlType;
-                bool isInteractive = (ct == ControlType.Button || ct == ControlType.MenuItem ||
-                                      ct == ControlType.SplitButton || ct == ControlType.Custom ||
-                                      ct == ControlType.Tab || ct == ControlType.TabItem ||
-                                      ct == ControlType.Hyperlink || ct == ControlType.Image);
-                if (!isInteractive) continue;
-                if (ct == ControlType.ToolBar) continue;
+                if (!IsValidUiaButton(el)) continue;
                 if (curIdx == btnIndex) return el;
                 curIdx++;
             }
