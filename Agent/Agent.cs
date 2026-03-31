@@ -1,4 +1,4 @@
-// =============================================================
+﻿// =============================================================
 //  GnwayAgent - 鏈嶅姟绔?Agent (Native Win32 Edition)
 //  閮ㄧ讲鍒颁簯鑱旀湇鍔″櫒锛岄€氳繃鍛藉悕绠￠亾鎺ユ敹鍛戒护锛屾搷浣滃悓 Session 鍐呯殑绋嬪簭
 //  鍩轰簬 EnumChildWindows 瀹炵幇鏋侀€熸棤鎰熺煡銆佺簿鍑嗛€忚鐨?VB6 鎻愬彇
@@ -23,14 +23,13 @@ namespace GnwayAgent
     {
         static void Main(string[] args)
         {
-            Console.OutputEncoding = System.Text.Encoding.UTF8;
             int port = 19090;
             if (args.Length > 0 && int.TryParse(args[0], out int p)) port = p;
 
-            Console.WriteLine("=== GnwayAgent Server (Native Win32 Edition) ===");
-            Console.WriteLine($"Process ID: {System.Diagnostics.Process.GetCurrentProcess().Id}");
-            Console.WriteLine($"TCP Port: {port} (Usage: Agent.exe 9090)");
-            Console.WriteLine($"Hostname: {Dns.GetHostName()}");
+            Console.WriteLine("=== GnwayAgent 服务端 (Native Win32 极速版) ===");
+            Console.WriteLine($"进程ID: {System.Diagnostics.Process.GetCurrentProcess().Id}");
+            Console.WriteLine($"TCP 端口: {port} (可附加参数启动修改，如: Agent.exe 9090)");
+            Console.WriteLine($"主机名称: {Dns.GetHostName()}");
 
             var tcpThread = new Thread(() =>
             {
@@ -43,7 +42,7 @@ namespace GnwayAgent
                         using var client = listener.AcceptTcpClient();
                         using var stream = client.GetStream();
                         var remoteEP = client.Client.RemoteEndPoint?.ToString() ?? "鏈煡IP";
-                        Console.WriteLine($"\n[TCP Connected] Controller ({remoteEP})");
+                        Console.WriteLine($"\n[TCP连接] Controller ({remoteEP}) 已接入！");
 
                         var reader = new StreamReader(stream, Encoding.UTF8);
                         var writer = new StreamWriter(stream, Encoding.UTF8) { AutoFlush = true };
@@ -51,22 +50,22 @@ namespace GnwayAgent
                         string? cmdLine = reader.ReadLine();
                         if (string.IsNullOrEmpty(cmdLine)) { writer.WriteLine("ERR:empty_command"); continue; }
 
-                        Console.WriteLine($"[CMD Received] {cmdLine}");
+                        Console.WriteLine($"[收到网络指令] {cmdLine}");
                         string? result = ProcessCommand(cmdLine, writer);
                         
                         if (result != null)
                         {
                             writer.WriteLine(result);
-                            Console.WriteLine($"[Response] {result}");
+                            Console.WriteLine($"[网络返回] {result}");
                         }
                         else
                         {
-                            Console.WriteLine($"[Response] <Stream Finished>");
+                            Console.WriteLine($"[网络返回] <流式输出完毕>");
                         }
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine($"[TCP Error] {ex.Message}");
+                        Console.WriteLine($"[TCP错误] {ex.Message}");
                         Thread.Sleep(500);
                     }
                 }
@@ -94,7 +93,7 @@ namespace GnwayAgent
                         string target = windows[menuIndex - 1].Split('|')[0]; // only get handle
                         if (target == "") target = windows[menuIndex - 1]; // fallback
 
-                        Console.WriteLine($"\n========== [Fetching Control Tree] {target} ==========");
+                        Console.WriteLine($"\n========== [拉取全部控件树] {target} ==========");
                         using var ms = new MemoryStream();
                         using var sw = new StreamWriter(ms, Encoding.UTF8) { AutoFlush = true };
                         ProcessCommand($"listcontrols|{target}", sw);
@@ -105,11 +104,11 @@ namespace GnwayAgent
                         try
                         {
                             File.WriteAllText("agent_dump.txt", fullOutput, Encoding.UTF8);
-                            Console.WriteLine("\n[Info] Tree saved to agent_dump.txt");
+                            Console.WriteLine("\n[⭐提示] 控件树已保存到 agent_dump.txt");
                         } catch { }
-                        Console.WriteLine("====================================================\nType 'm' to refresh");
+                        Console.WriteLine("====================================================\n输入 'm' 刷新");
                     }
-                    else Console.WriteLine(">>> Invalid number");
+                    else Console.WriteLine(">>> 编号无效");
                     continue;
                 }
 
@@ -129,7 +128,7 @@ namespace GnwayAgent
                         Console.WriteLine("\n[info] Result dumped to agent_dump.txt");
                     }
                 }
-                catch (Exception ex) { Console.WriteLine($"[Local Error] {ex.Message}"); }
+                catch (Exception ex) { Console.WriteLine($"[本地错误] {ex.Message}"); }
             }
         }
 
@@ -148,11 +147,11 @@ namespace GnwayAgent
 
         static void PrintMenu()
         {
-            Console.WriteLine("\n==== [Agent Local Menu] ====");
+            Console.WriteLine("\n==== [Agent 本地懒人调试菜单] ====");
             var list = GetValidWindows();
             for (int i = 0; i < list.Count; i++) Console.WriteLine($" [{i + 1}] {list[i]}");
             Console.WriteLine("==================================");
-            Console.Write("\nEnter number or command (e.g. m): ");
+            Console.Write("\n请输入数字或指令 (如: m): ");
         }
 
         static string? ProcessCommand(string cmdLine, TextWriter writer)
