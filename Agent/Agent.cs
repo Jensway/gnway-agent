@@ -664,17 +664,25 @@ namespace GnwayAgent
             if (tbCount > 0)
             {
                 Console.WriteLine($"  [Win32工具栏] {parentMagicId} 发现 {tbCount} 个原生按钮");
+                int validFound = 0;
                 for (int i = 0; i < tbCount; i++)
                 {
+                    RECT rect = GetToolbarButtonRect(parentHwnd, i);
+                    int w = rect.Right - rect.Left;
+                    if (w <= 0) continue; // 跳过不可见或作为分隔符的工具栏按钮
+
                     StringBuilder sbText = new StringBuilder(260);
                     SendMessage(parentHwnd, TB_GETBUTTONTEXTW, (IntPtr)i, sbText);
                     string text = sbText.ToString();
-                    if (string.IsNullOrEmpty(text)) text = $"Button{i + 1}";
+                    if (string.IsNullOrEmpty(text)) text = $"Btn{i + 1}";
+                    
                     string magicId = $"<TB_{parentMagicId}_BTN{i + 1}>";
-                    writer.WriteLine($"TB_Button|{depth}|{magicId}|{text}||1");
+                    string displayRect = $"[{rect.Left},{rect.Top} Width:{w}]";
+                    writer.WriteLine($"TB_Button|{depth}|{magicId}|{text}|{displayRect}|1");
                     Console.WriteLine($"    [TB_{i + 1}] {text}");
+                    validFound++;
                 }
-                return;
+                if (validFound > 0) return; // 如果真正找到了有效的、可见的原生按钮，就直接返回，否则向下走 MSAA/UIA
             }
 
             // 策略2: MSAA/IAccessible
@@ -691,25 +699,43 @@ namespace GnwayAgent
                         object[] children = new object[childCount];
                         AccessibleChildren(acc, 0, childCount, children, out int obtained);
                         int btnIdx = 1;
+                        int validMsaaCount = 0;
                         for (int i = 0; i < obtained; i++)
                         {
                             try
                             {
+                                int px = 0, py = 0, pw = 0, ph = 0;
+                                try { acc.accLocation(out px, out py, out pw, out ph, children[i]); } catch { }
+                                if (pw <= 0 || ph <= 0) 
+                                {
+                                    // 虽然我们跳过打印，但为了保证 MSAA 的序号点击一致，必须保证 idx 也是这里跳过的
+                                    // 实际 DoClick 时 MSAA 的 idx 是独立计数的，但在现在的逻辑中两边规则必须镜像
+                                    // 只要两边都是：满足 is interactive 就 idx++，那就能一致。
+                                }
+
                                 string name = "";
                                 try { name = acc.get_accName(children[i]) ?? ""; } catch { }
                                 string role = "";
                                 try { role = acc.get_accRole(children[i])?.ToString() ?? ""; } catch { }
-                                if (!string.IsNullOrWhiteSpace(name) || role.Contains("43") || role.Contains("push"))
+                                
+                                bool matchesRole = !string.IsNullOrWhiteSpace(name) || role.Contains("43") || role.Contains("push");
+                                
+                                if (matchesRole)
                                 {
-                                    string magicId = $"<MSAA_{parentMagicId}_BTN{btnIdx}>";
-                                    writer.WriteLine($"MSAA_Button|{depth}|{magicId}|{name}||1");
-                                    Console.WriteLine($"    [MSAA_{btnIdx}] {name} role={role}");
-                                    btnIdx++;
+                                    if (pw > 0 && ph > 0) // 只有可见才输出给前端
+                                    {
+                                        string magicId = $"<MSAA_{parentMagicId}_BTN{btnIdx}>";
+                                        string displayRect = $"[{px},{py} Width:{pw}]";
+                                        writer.WriteLine($"MSAA_Button|{depth}|{magicId}|{name}|{displayRect}|1");
+                                        Console.WriteLine($"    [MSAA_{btnIdx}] {name} role={role}");
+                                        validMsaaCount++;
+                                    }
+                                    btnIdx++; // 无论是否隐藏，只要符合查找Role特征，就消耗一个索引。这样与 DoClick 的逻辑完全一致
                                 }
                             }
                             catch { }
                         }
-                        if (btnIdx > 1) return;
+                        if (validMsaaCount > 0) return;
                     }
                 }
             }
