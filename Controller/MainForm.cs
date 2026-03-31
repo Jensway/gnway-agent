@@ -49,7 +49,7 @@ namespace GnwayController
 
         // ── 控件引用 ─────────────────────────────────────────
         TextBox        _tbServer   = null!;
-        TextBox        _tbWindow   = null!;
+        ComboBox       _tbWindow   = null!;
         Button         _btnTest    = null!;
         Button         _btnRefresh = null!;
         Label          _lblConn    = null!;
@@ -159,10 +159,10 @@ namespace GnwayController
             };
             toolbar.Controls.Add(_lblConn); x += 145;
 
-            toolbar.Controls.Add(Lbl("目标窗口（模糊匹配）", toolbar, new Point(x, 8)));
-            _tbWindow = new TextBox {
+            toolbar.Controls.Add(Lbl("目标窗口（可用下拉或模糊匹配）", toolbar, new Point(x, 8)));
+            _tbWindow = new ComboBox {
                 Text = "", Width = 280, Location = new Point(x, 26),
-                Font = F_BODY, BorderStyle = BorderStyle.FixedSingle
+                Font = F_BODY, DropDownStyle = ComboBoxStyle.DropDown
             };
             toolbar.Controls.Add(_tbWindow); x += 292;
 
@@ -471,11 +471,17 @@ namespace GnwayController
 
             if (r.StartsWith("OK"))
             {
-                int wc = r.Length > 3
-                    ? r.Substring(3).Split(new[] { "|||" }, StringSplitOptions.RemoveEmptyEntries).Length
-                    : 0;
+                string[] wins = r.Length > 3
+                    ? r.Substring(3).Split(new[] { "|||" }, StringSplitOptions.RemoveEmptyEntries)
+                    : Array.Empty<string>();
+
                 _lblConn.ForeColor = C_OK;
-                _lblConn.Text = $"✓ 连接正常（{wc} 窗口）";
+                _lblConn.Text = $"✓ 连接正常（{wins.Length} 窗口）";
+
+                _tbWindow.Items.Clear();
+                _tbWindow.Items.AddRange(wins);
+                if (wins.Length > 0 && string.IsNullOrWhiteSpace(_tbWindow.Text))
+                    _tbWindow.SelectedIndex = 0;
             }
             else
             {

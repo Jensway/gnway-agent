@@ -531,8 +531,7 @@ namespace GnwayAgent
                 TreeScope.Children, Condition.TrueCondition);
 
             foreach (AutomationElement e in all)
-                if (e.Current.Name.Contains(titlePattern)
-                    && e.Current.IsOffscreen == false)
+                if (e.Current.Name.Contains(titlePattern))
                     return e;
 
             return null;
@@ -841,7 +840,7 @@ namespace GnwayAgent
             foreach (AutomationElement e in all)
             {
                 string n = e.Current.Name ?? "";
-                if (!string.IsNullOrEmpty(n) && !e.Current.IsOffscreen)
+                if (!string.IsNullOrEmpty(n))
                     names.Add(n);
             }
             return "OK:" + string.Join("|||", names);
