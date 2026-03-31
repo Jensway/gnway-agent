@@ -21,30 +21,31 @@ namespace GnwayAgent
 {
     class Agent
     {
-        const string PIPE_NAME = "GnwayAgentPipe";
-
         static void Main(string[] args)
         {
+            int port = 19090;
+            if (args.Length > 0 && int.TryParse(args[0], out int p)) port = p;
+
             Console.WriteLine("=== GnwayAgent 服务端 (Native Win32 极速版) ===");
             Console.WriteLine($"进程ID: {System.Diagnostics.Process.GetCurrentProcess().Id}");
-            Console.WriteLine($"管道名称: {PIPE_NAME}");
+            Console.WriteLine($"TCP 端口: {port} (可附加参数启动修改，如: Agent.exe 9090)");
             Console.WriteLine($"主机名称: {Dns.GetHostName()}");
 
-            var pipeThread = new Thread(() =>
+            var tcpThread = new Thread(() =>
             {
+                var listener = new TcpListener(IPAddress.Any, port);
+                listener.Start();
                 while (true)
                 {
                     try
                     {
-                        using var server = new NamedPipeServerStream(
-                            PIPE_NAME, PipeDirection.InOut, 1,
-                            PipeTransmissionMode.Message, PipeOptions.None);
+                        using var client = listener.AcceptTcpClient();
+                        using var stream = client.GetStream();
+                        var remoteEP = client.Client.RemoteEndPoint?.ToString() ?? "未知IP";
+                        Console.WriteLine($"\n[TCP连接] Controller ({remoteEP}) 已接入！");
 
-                        server.WaitForConnection();
-                        Console.WriteLine("\n[网络连接] Controller 已从外部接入管道！");
-
-                        var reader = new StreamReader(server, Encoding.UTF8);
-                        var writer = new StreamWriter(server, Encoding.UTF8) { AutoFlush = true };
+                        var reader = new StreamReader(stream, Encoding.UTF8);
+                        var writer = new StreamWriter(stream, Encoding.UTF8) { AutoFlush = true };
 
                         string? cmdLine = reader.ReadLine();
                         if (string.IsNullOrEmpty(cmdLine)) { writer.WriteLine("ERR:空命令"); continue; }
@@ -57,17 +58,20 @@ namespace GnwayAgent
                             writer.WriteLine(result);
                             Console.WriteLine($"[网络返回] {result}");
                         }
-                        else Console.WriteLine($"[网络返回] <流式输出完毕>");
+                        else
+                        {
+                            Console.WriteLine($"[网络返回] <流式输出完毕>");
+                        }
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine($"[网络管道错误] {ex.Message}");
+                        Console.WriteLine($"[TCP错误] {ex.Message}");
                         Thread.Sleep(500);
                     }
                 }
             });
-            pipeThread.IsBackground = true;
-            pipeThread.Start();
+            tcpThread.IsBackground = true;
+            tcpThread.Start();
 
             PrintMenu();
 
@@ -507,7 +511,25 @@ namespace GnwayAgent
                 if (visible && w > 0) display += $" [矩形:{rect.Left},{rect.Top} 宽:{w}]";
                 
                 string pad = new string('-', depth * 2) + " ";
-                writer.WriteLine($"{cls}|{pad}{display}|{(enabled ? "1" : "0")}");
+                
+                // 白噪音垃圾容器过滤 (仅限没有显示标题的透明/装饰类)
+                bool isNoise = string.IsNullOrWhiteSpace(text) && (
+                    cls.IndexOf("Timer", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                    cls.IndexOf("PictureBox", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                    cls.IndexOf("UserControl", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                    cls.IndexOf("DockWnd", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                    cls.IndexOf("DynaBar", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                    cls.IndexOf("ScrollBar", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                    cls.IndexOf("MDIClient", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                    cls.IndexOf("OleControl", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                    cls.IndexOf("Embedding", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                    cls.Equals("Static", StringComparison.OrdinalIgnoreCase)
+                );
+
+                if (!isNoise)
+                {
+                    writer.WriteLine($"{cls}|{pad}{display}|{(enabled ? "1" : "0")}");
+                }
                 
                 WalkWin32Tree(child, writer, depth + 1, counters);
                 child = GetWindow(child, GW_HWNDNEXT);
