@@ -303,48 +303,6 @@ namespace GnwayController
         {
             SectionHeader("已录制的事件", panel, DockStyle.Top);
 
-            // ── 新增：快捷测试直连栏 (免保存测试) ──
-            var quickBar = new Panel { Dock = DockStyle.Top, Height = 42, BackColor = Color.FromArgb(240, 246, 252) };
-            quickBar.Paint += (s, e) => e.Graphics.DrawLine(new Pen(C_BORDER), 0, quickBar.Height - 1, quickBar.Width, quickBar.Height - 1);
-            panel.Controls.Add(quickBar);
-
-            int qx = 8;
-            quickBar.Controls.Add(Lbl("直连闪击:", quickBar, new Point(qx, 12))); qx += 64;
-            
-            var tbCtrl = new TextBox { Width = 110, Location = new Point(qx, 10), Font = F_BODY };
-            quickBar.Controls.Add(tbCtrl); qx += 116;
-            
-            var cbAct = new ComboBox { Width = 70, Location = new Point(qx, 9), DropDownStyle = ComboBoxStyle.DropDownList };
-            cbAct.Items.AddRange(new[] { "click", "input", "sendkeys", "select" }); cbAct.SelectedIndex = 0;
-            quickBar.Controls.Add(cbAct); qx += 76;
-            
-            var tbVal = new TextBox { Width = 90, Location = new Point(qx, 10), Font = F_BODY };
-            quickBar.Controls.Add(tbVal); qx += 96;
-            
-            var btnSend = Btn("🚀 发射", quickBar, new Point(qx, 8), 66, Color.FromArgb(7, 140, 190), Color.White);
-            btnSend.Click += async (s, e) => {
-                string win = _dgvWindows.SelectedRows.Count > 0 ? _dgvWindows.SelectedRows[0].Cells[0].Value?.ToString() ?? "" : "";
-                string ctl = tbCtrl.Text.Trim();
-                if (string.IsNullOrEmpty(win) || string.IsNullOrEmpty(ctl)) {
-                    MessageBox.Show("左侧在线窗口、及这里的控件名均不能为空！\n提示：直接填入服务端打出的或选中窗口。", "校验失败", MessageBoxButtons.OK, MessageBoxIcon.Warning); return;
-                }
-                string act = cbAct.Text;
-                string val = tbVal.Text;
-                string cmd = (act == "input" || act == "select" || act == "click") ? (string.IsNullOrWhiteSpace(val) ? $"{act}|{win}|{ctl}" : $"{act}|{win}|{ctl}|{val}") : $"{act}|{win}|{ctl}";
-                
-                var client = new AgentClient(_tbServer.Text.Trim(), timeoutMs: 15000);
-                AppendTest($"[独立闪击] 正在发送: {cmd}", C_ACCENT);
-                btnSend.Enabled = false;
-                try {
-                    string r = await Task.Run(() => client.Send(cmd));
-                    AppendTest(r, r.StartsWith("OK") ? C_OK : C_ERR);
-                } catch (Exception ex) {
-                    AppendTest($"网络或底层崩溃: {ex.Message}", C_ERR);
-                }
-                btnSend.Enabled = true;
-            };
-            quickBar.Controls.Add(btnSend);
-
             // 按钮条
             var btnBar = new Panel { Dock = DockStyle.Top, Height = 32, BackColor = C_CARD };
             panel.Controls.Add(btnBar);
@@ -391,7 +349,7 @@ namespace GnwayController
             };
             panel.Controls.Add(innerSplit);
             this.Load += (_, __) => {
-                innerSplit.SplitterDistance = (int)(innerSplit.Width * 0.50);
+                innerSplit.SplitterDistance = (int)(innerSplit.Height * 0.60);
             };
 
             // ── 左半：流程步骤列表 ────────────────────────────
