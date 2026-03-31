@@ -27,10 +27,10 @@ namespace GnwayAgent
             int port = 19090;
             if (args.Length > 0 && int.TryParse(args[0], out int p)) port = p;
 
-            Console.WriteLine("=== GnwayAgent 鏈嶅姟绔?(Native Win32 鏋侀€熺増) ===");
-            Console.WriteLine($"杩涚▼ID: {System.Diagnostics.Process.GetCurrentProcess().Id}");
-            Console.WriteLine($"TCP 绔彛: {port} (鍙檮鍔犲弬鏁板惎鍔ㄤ慨鏀癸紝濡? Agent.exe 9090)");
-            Console.WriteLine($"涓绘満鍚嶇О: {Dns.GetHostName()}");
+            Console.WriteLine("=== GnwayAgent Server (Native Win32 Edition) ===");
+            Console.WriteLine($"Process ID: {System.Diagnostics.Process.GetCurrentProcess().Id}");
+            Console.WriteLine($"TCP Port: {port} (Usage: Agent.exe 9090)");
+            Console.WriteLine($"Hostname: {Dns.GetHostName()}");
 
             var tcpThread = new Thread(() =>
             {
@@ -43,7 +43,7 @@ namespace GnwayAgent
                         using var client = listener.AcceptTcpClient();
                         using var stream = client.GetStream();
                         var remoteEP = client.Client.RemoteEndPoint?.ToString() ?? "鏈煡IP";
-                        Console.WriteLine($"\n[TCP杩炴帴] Controller ({remoteEP}) 宸叉帴鍏ワ紒");
+                        Console.WriteLine($"\n[TCP Connected] Controller ({remoteEP})");
 
                         var reader = new StreamReader(stream, Encoding.UTF8);
                         var writer = new StreamWriter(stream, Encoding.UTF8) { AutoFlush = true };
@@ -51,22 +51,22 @@ namespace GnwayAgent
                         string? cmdLine = reader.ReadLine();
                         if (string.IsNullOrEmpty(cmdLine)) { writer.WriteLine("ERR:empty_command"); continue; }
 
-                        Console.WriteLine($"[鏀跺埌缃戠粶鎸囦护] {cmdLine}");
+                        Console.WriteLine($"[CMD Received] {cmdLine}");
                         string? result = ProcessCommand(cmdLine, writer);
                         
                         if (result != null)
                         {
                             writer.WriteLine(result);
-                            Console.WriteLine($"[缃戠粶杩斿洖] {result}");
+                            Console.WriteLine($"[Response] {result}");
                         }
                         else
                         {
-                            Console.WriteLine($"[缃戠粶杩斿洖] <娴佸紡杈撳嚭瀹屾瘯>");
+                            Console.WriteLine($"[Response] <Stream Finished>");
                         }
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine($"[TCP閿欒] {ex.Message}");
+                        Console.WriteLine($"[TCP Error] {ex.Message}");
                         Thread.Sleep(500);
                     }
                 }
@@ -94,7 +94,7 @@ namespace GnwayAgent
                         string target = windows[menuIndex - 1].Split('|')[0]; // only get handle
                         if (target == "") target = windows[menuIndex - 1]; // fallback
 
-                        Console.WriteLine($"\n========== [鎷夊彇鍏ㄩ儴鎺т欢鏍慮 {target} ==========");
+                        Console.WriteLine($"\n========== [Fetching Control Tree] {target} ==========");
                         using var ms = new MemoryStream();
                         using var sw = new StreamWriter(ms, Encoding.UTF8) { AutoFlush = true };
                         ProcessCommand($"listcontrols|{target}", sw);
@@ -105,11 +105,11 @@ namespace GnwayAgent
                         try
                         {
                             File.WriteAllText("agent_dump.txt", fullOutput, Encoding.UTF8);
-                            Console.WriteLine("\n[猸?鎻愮ず] 鎺т欢鏍戝凡淇濆瓨鍒?agent_dump.txt");
+                            Console.WriteLine("\n[Info] Tree saved to agent_dump.txt");
                         } catch { }
-                        Console.WriteLine("====================================================\n杈撳叆 'm' 鍒锋柊");
+                        Console.WriteLine("====================================================\nType 'm' to refresh");
                     }
-                    else Console.WriteLine(">>> 缂栧彿鏃犳晥");
+                    else Console.WriteLine(">>> Invalid number");
                     continue;
                 }
 
@@ -129,7 +129,7 @@ namespace GnwayAgent
                         Console.WriteLine("\n[info] Result dumped to agent_dump.txt");
                     }
                 }
-                catch (Exception ex) { Console.WriteLine($"[鏈湴閿欒] {ex.Message}"); }
+                catch (Exception ex) { Console.WriteLine($"[Local Error] {ex.Message}"); }
             }
         }
 
@@ -148,11 +148,11 @@ namespace GnwayAgent
 
         static void PrintMenu()
         {
-            Console.WriteLine("\n==== [Agent 鏈湴鎳掍汉璋冭瘯鑿滃崟] ====");
+            Console.WriteLine("\n==== [Agent Local Menu] ====");
             var list = GetValidWindows();
             for (int i = 0; i < list.Count; i++) Console.WriteLine($" [{i + 1}] {list[i]}");
             Console.WriteLine("==================================");
-            Console.Write("\n璇疯緭鍏ユ暟瀛楁垨鎸囦护 (濡? m): ");
+            Console.Write("\nEnter number or command (e.g. m): ");
         }
 
         static string? ProcessCommand(string cmdLine, TextWriter writer)
