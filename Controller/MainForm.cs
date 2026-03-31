@@ -125,7 +125,7 @@ namespace GnwayController
 
             // ── 工具栏 ───────────────────────────────────────
             var toolbar = new Panel {
-                Dock = DockStyle.Top, Height = 50,
+                Dock = DockStyle.Top, Height = 56,
                 BackColor = C_CARD, Padding = new Padding(10, 0, 10, 0)
             };
             toolbar.Paint += (s, e) =>
@@ -172,6 +172,7 @@ namespace GnwayController
                 Panel1MinSize = 280
             };
             Controls.Add(split);
+            split.BringToFront(); // [!!! FIX MANGLED FORM LAYOUT OVERLAP !!!]
             this.Load += (_, __) => split.SplitterDistance = (int)(ClientSize.Width * 0.40);
 
             BuildLeftPanel(split.Panel1);
@@ -270,6 +271,8 @@ namespace GnwayController
             var btnClearTest = Btn("清空", bottom, new Point(146, 122), 52, C_BG, C_SUB);
             btnClearTest.Click += (_, __) => { _rtTestOut.Clear(); _btnSave.Enabled = false; };
             bottom.Controls.Add(btnClearTest);
+
+            _dgvTree.BringToFront(); // [!!! FIX MANGLED LEFT PANEL (TREE DATA GRID) OVERLAP !!!]
         }
 
         // =====================================================
@@ -368,6 +371,7 @@ namespace GnwayController
             _lvEvents.Columns.Add("窗口", 160);
             _lvEvents.Columns.Add("动作",  -2);
             panel.Controls.Add(_lvEvents);
+            _lvEvents.BringToFront(); // [!!! FIX MANGLED RIGHT-TOP PANEL (EVENTS LIST) OVERLAP !!!]
         }
 
         // ── 右下：流程步骤 + 执行控制 + 日志 ─────────────────
@@ -408,6 +412,7 @@ namespace GnwayController
             _lvSteps.Columns.Add("事件名", 130);
             _lvSteps.Columns.Add("窗口",   -2);
             innerSplit.Panel1.Controls.Add(_lvSteps);
+            _lvSteps.BringToFront(); // [!!! FIX MANGLED RIGHT-BOTTOM-LEFT PANEL (FLOW STEPS) OVERLAP !!!]
 
             // ── 右半：执行控制 + 日志 ─────────────────────────
             SectionHeader("执行控制 & 日志", innerSplit.Panel2, DockStyle.Top);
@@ -448,6 +453,7 @@ namespace GnwayController
                 ReadOnly = true, ScrollBars = RichTextBoxScrollBars.Vertical
             };
             innerSplit.Panel2.Controls.Add(_rtLog);
+            _rtLog.BringToFront(); // [!!! FIX MANGLED RIGHT-BOTTOM-RIGHT PANEL (LOG TEXTBOX) OVERLAP !!!]
         }
 
         // =====================================================
