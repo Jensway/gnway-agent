@@ -408,8 +408,13 @@ namespace GnwayController
             _btnStepRm.Click  += OnStepRemove;
             _btnStepUp  = Btn("↑", stepBtnBar, new Point(sx, 4), 28, C_BG, C_TEXT); sx += 34;
             _btnStepUp.Click  += (_, __) => MoveStep(-1);
-            _btnStepDn  = Btn("↓", stepBtnBar, new Point(sx, 4), 28, C_BG, C_TEXT);
+            _btnStepDn  = Btn("↓", stepBtnBar, new Point(sx, 4), 28, C_BG, C_TEXT); sx += 34;
             _btnStepDn.Click  += (_, __) => MoveStep(+1);
+            
+            var btnImport = Btn("📂 导入", stepBtnBar, new Point(sx, 4), 60, C_BG, C_TEXT); sx += 66;
+            btnImport.Click += OnFlowImport;
+            var btnExport = Btn("💾 导出", stepBtnBar, new Point(sx, 4), 60, C_BG, C_TEXT);
+            btnExport.Click += OnFlowExport;
 
             _lvSteps = new ListView {
                 Dock = DockStyle.Fill, View = View.Details,
@@ -896,6 +901,69 @@ namespace GnwayController
             _store.SaveFlow(_flowSteps);
             RefreshFlowListView();
             _lvSteps.Items[nIdx].Selected = true;
+        }
+
+        // =====================================================
+        //  流程导出与导入
+        // =====================================================
+        private void OnFlowExport(object? s, EventArgs e)
+        {
+            if (_flowSteps.Count == 0) { MessageBox.Show("当前流程为空，无法导出！", "提示", MessageBoxButtons.OK, MessageBoxIcon.Information); return; }
+            using var sfd = new SaveFileDialog { Filter = "流程文件 (*.flow)|*.flow", Title = "导出当前流程", FileName = "MyAutoFlow.flow" };
+            if (sfd.ShowDialog() == DialogResult.OK)
+            {
+                try {
+                    var export = new Dictionary<string, object> {
+                        ["FlowSteps"] = _flowSteps,
+                        ["Events"] = _flowSteps.Select(id => _allEvents.FirstOrDefault(x => x.Id == id)).Where(ev => ev != null).ToList()
+                    };
+                    var json = new System.Web.Script.Serialization.JavaScriptSerializer { MaxJsonLength = int.MaxValue }.Serialize(export);
+                    File.WriteAllText(sfd.FileName, json, System.Text.Encoding.UTF8);
+                    AppendLog($"💾 已成功导出流程及相关事件配置：{Path.GetFileName(sfd.FileName)}", C_OK);
+                } catch (Exception ex) {
+                    MessageBox.Show("导出失败：" + ex.Message, "错误", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
+            }
+        }
+
+        private void OnFlowImport(object? s, EventArgs e)
+        {
+            using var ofd = new OpenFileDialog { Filter = "流程文件 (*.flow)|*.flow", Title = "导入流程" };
+            if (ofd.ShowDialog() == DialogResult.OK)
+            {
+                try {
+                    string json = File.ReadAllText(ofd.FileName, System.Text.Encoding.UTF8);
+                    var js = new System.Web.Script.Serialization.JavaScriptSerializer { MaxJsonLength = int.MaxValue };
+                    var exportDict = js.Deserialize<Dictionary<string, object>>(json);
+                    
+                    var newFlowSteps = new List<string>();
+                    if (exportDict.ContainsKey("FlowSteps"))
+                    {
+                        var arr = exportDict["FlowSteps"] as System.Collections.ArrayList;
+                        if (arr != null) foreach (var a in arr) newFlowSteps.Add(a?.ToString() ?? "");
+                    }
+                    
+                    if (exportDict.ContainsKey("Events"))
+                    {
+                        var eventsObj = exportDict["Events"];
+                        string evJson = js.Serialize(eventsObj);
+                        var importedEvents = js.Deserialize<List<AutoEvent>>(evJson);
+                        if (importedEvents != null)
+                        {
+                            foreach(var ev in importedEvents) {
+                                _store.Save(ev);
+                            }
+                        }
+                    }
+
+                    _flowSteps = newFlowSteps;
+                    _store.SaveFlow(_flowSteps);
+                    ReloadEvents();
+                    AppendLog($"📂 已成功从 {Path.GetFileName(ofd.FileName)} 导入并加载了 {newFlowSteps.Count} 个步骤。", C_OK);
+                } catch (Exception ex) {
+                    MessageBox.Show("导入失败：" + ex.Message, "错误", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
+            }
         }
 
         // =====================================================
