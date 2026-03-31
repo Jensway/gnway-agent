@@ -928,15 +928,14 @@ namespace GnwayController
             if (IsGridType(type))        return "选行▼";
             if (type == "Edit" ||
                 type.Contains("Text") ||
-                type == "Document")      return "输入";
+                type == "Document")      return "input";
             if (type == "ComboBox" ||
                 type == "List")          return "选择▼";
-            return "点击";
+            return "click";
         }
 
         private static bool IsGridType(string type)
-            => type == "DataGrid" || type == "List" || type == "Table"
-            || type == "DataItem" || type == "Tree";
+            => type.Contains("Grid") || type.Contains("List") || type.Contains("Table") || type.Contains("Tree");
 
         private string BuildCmd(AutoEvent ev)
         {
