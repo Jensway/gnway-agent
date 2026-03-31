@@ -324,7 +324,26 @@ namespace GnwayAgent
                 // TB_ 前缀: 读取目标进程 RECT 后执行物理坐标点击
                 if (controlName.Contains("<TB_"))
                 {
-                    int idx = btnIndex - 1;
+                    int targetSystemIdx = -1;
+                    int validIdx = 0;
+                    int tbCount = (int)SendMessage(parentHwnd, TB_BUTTONCOUNT, IntPtr.Zero, IntPtr.Zero);
+                    for (int i = 0; i < tbCount; i++)
+                    {
+                        RECT r = GetToolbarButtonRect(parentHwnd, i);
+                        if ((r.Right - r.Left) > 0)
+                        {
+                            validIdx++;
+                            if (validIdx == btnIndex)
+                            {
+                                targetSystemIdx = i;
+                                break;
+                            }
+                        }
+                    }
+
+                    if (targetSystemIdx == -1) return $"ERR:在当前工具栏中找不到第 {btnIndex} 个有效按键";
+
+                    int idx = targetSystemIdx;
                     RECT btnRect = GetToolbarButtonRect(parentHwnd, idx);
                     if (btnRect.Right > btnRect.Left) // 有效的包围盒
                     {
@@ -343,7 +362,7 @@ namespace GnwayAgent
                         System.Windows.Forms.Cursor.Position = tbPt; Thread.Sleep(50);
                         mouse_event(MOUSEEVENTF_LEFTDOWN, tbPt.X, tbPt.Y, 0, 0); Thread.Sleep(50);
                         mouse_event(MOUSEEVENTF_LEFTUP, tbPt.X, tbPt.Y, 0, 0);
-                        return $"OK:已物理点击工具栏按钮 [{controlName}]";
+                        return $"OK:已物理点击工具栏按钮 [{controlName}] (内部索引:{idx})";
                     }
                     else
                     {
@@ -373,7 +392,12 @@ namespace GnwayAgent
                                 try { name = acc.get_accName(children[i]) ?? ""; } catch { }
                                 string role = "";
                                 try { role = acc.get_accRole(children[i])?.ToString() ?? ""; } catch { }
-                                if (!string.IsNullOrWhiteSpace(name) || role.Contains("43") || role.Contains("push"))
+                                
+                                int px = 0, py = 0, pw = 0, ph = 0;
+                                try { acc.accLocation(out px, out py, out pw, out ph, children[i]); } catch { }
+
+                                bool matchesRole = !string.IsNullOrWhiteSpace(name) || role.Contains("43") || role.Contains("push");
+                                if (matchesRole && pw > 0 && ph > 0)
                                 {
                                     if (curIdx == btnIndex)
                                     {
@@ -671,16 +695,17 @@ namespace GnwayAgent
                     int w = rect.Right - rect.Left;
                     if (w <= 0) continue; // 跳过不可见或作为分隔符的工具栏按钮
 
+                    validFound++;
+
                     StringBuilder sbText = new StringBuilder(260);
                     SendMessage(parentHwnd, TB_GETBUTTONTEXTW, (IntPtr)i, sbText);
                     string text = sbText.ToString();
-                    if (string.IsNullOrEmpty(text)) text = $"Btn{i + 1}";
+                    if (string.IsNullOrEmpty(text)) text = $"Btn{validFound}";
                     
-                    string magicId = $"<TB_{parentMagicId}_BTN{i + 1}>";
+                    string magicId = $"<TB_{parentMagicId}_BTN{validFound}>";
                     string displayRect = $"[{rect.Left},{rect.Top} Width:{w}]";
                     writer.WriteLine($"TB_Button|{depth}|{magicId}|{text}|{displayRect}|1");
-                    Console.WriteLine($"    [TB_{i + 1}] {text}");
-                    validFound++;
+                    Console.WriteLine($"    [TB_{validFound}] {text}");
                 }
                 if (validFound > 0) return; // 如果真正找到了有效的、可见的原生按钮，就直接返回，否则向下走 MSAA/UIA
             }
@@ -720,16 +745,13 @@ namespace GnwayAgent
                                 
                                 bool matchesRole = !string.IsNullOrWhiteSpace(name) || role.Contains("43") || role.Contains("push");
                                 
-                                if (matchesRole)
+                                if (matchesRole && pw > 0 && ph > 0)
                                 {
-                                    if (pw > 0 && ph > 0) // 只有可见才输出给前端
-                                    {
-                                        string magicId = $"<MSAA_{parentMagicId}_BTN{btnIdx}>";
-                                        string displayRect = $"[{px},{py} Width:{pw}]";
-                                        writer.WriteLine($"MSAA_Button|{depth}|{magicId}|{name}|{displayRect}|1");
-                                        Console.WriteLine($"    [MSAA_{btnIdx}] {name} role={role}");
-                                        validMsaaCount++;
-                                    }
+                                    string magicId = $"<MSAA_{parentMagicId}_BTN{btnIdx}>";
+                                    string displayRect = $"[{px},{py} Width:{pw}]";
+                                    writer.WriteLine($"MSAA_Button|{depth}|{magicId}|{name}|{displayRect}|1");
+                                    Console.WriteLine($"    [MSAA_{btnIdx}] {name} role={role}");
+                                    validMsaaCount++;
                                     btnIdx++; // 无论是否隐藏，只要符合查找Role特征，就消耗一个索引。这样与 DoClick 的逻辑完全一致
                                 }
                             }
