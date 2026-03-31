@@ -1196,11 +1196,11 @@ namespace GnwayController
         }
 
         // ── 工厂方法 ─────────────────────────────────────────
-        private static Label Lbl(string text, Control parent, Point loc)
+        private static Label Lbl(string text, Control parent, Point loc, Color? foreColor = null, Font? font = null)
         {
             var l = new Label {
                 Text = text, Location = loc, AutoSize = true,
-                Font = F_SMALL, ForeColor = C_SUB, BackColor = Color.Transparent
+                Font = font ?? F_SMALL, ForeColor = foreColor ?? C_SUB, BackColor = Color.Transparent
             };
             parent.Controls.Add(l);
             return l;
