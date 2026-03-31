@@ -278,21 +278,77 @@ namespace GnwayAgent
         static string DoClick(IntPtr window, string[] parts)
         {
             string controlName = parts[2];
-            if (controlName.Contains("<UIA_"))
+            if (controlName.Contains("<UIA_") || controlName.Contains("<TB_") || controlName.Contains("<MSAA_"))
             {
-                var el = FindUiaVirtualControl(window, controlName);
-                if (!el.Current.IsEnabled) return "ERR:Control disabled";
-                try {
-                    ((InvokePattern)el.GetCurrentPattern(InvokePattern.Pattern)).Invoke();
-                    return $"OK:已原生虚拟点击 [{controlName}]";
-                } catch {
-                    var uiaRect = el.Current.BoundingRectangle;
-                    System.Drawing.Point uiaPt = new System.Drawing.Point((int)(uiaRect.Left + uiaRect.Width/2), (int)(uiaRect.Top + uiaRect.Height/2));
-                    System.Windows.Forms.Cursor.Position = uiaPt; Thread.Sleep(50);
-                    mouse_event(MOUSEEVENTF_LEFTDOWN, uiaPt.X, uiaPt.Y, 0, 0); Thread.Sleep(50);
-                    mouse_event(MOUSEEVENTF_LEFTUP, uiaPt.X, uiaPt.Y, 0, 0);
-                    return $"OK:已虚拟坐标点击 [{controlName}]";
+                var match = System.Text.RegularExpressions.Regex.Match(controlName, @"<(?:UIA|MSAA|TB)_([A-Za-z0-9_]+?)(\d+)_BTN(\d+)>");
+                if (!match.Success) return "ERR:无效的虚拟按键格式";
+                string parentMagic = $"<{match.Groups[1].Value}{match.Groups[2].Value}>";
+                int btnIndex = int.Parse(match.Groups[3].Value);
+                IntPtr parentHwnd = FindControl(window, parentMagic);
+                if (parentHwnd == IntPtr.Zero) return $"ERR:找不到宿主工具栏 {parentMagic}";
+
+                // TB_ 前缀: 用 Win32 TB_PRESSBUTTON 消息直接按下
+                if (controlName.Contains("<TB_"))
+                {
+                    // 先获取按钮的 Command ID
+                    SendMessage(parentHwnd, TB_PRESSBUTTON, (IntPtr)(btnIndex - 1), (IntPtr)1);
+                    Thread.Sleep(100);
+                    SendMessage(parentHwnd, TB_PRESSBUTTON, (IntPtr)(btnIndex - 1), (IntPtr)0);
+                    return $"OK:已按下工具栏按钮 [{controlName}]";
                 }
+
+                // MSAA_ 前缀: 用 IAccessible.accDoDefaultAction
+                if (controlName.Contains("<MSAA_"))
+                {
+                    try
+                    {
+                        Guid iidAcc = new Guid("618736E0-3C3D-11CF-810C-00AA00389B71");
+                        int hr = AccessibleObjectFromWindow(parentHwnd, OBJID_CLIENT, ref iidAcc, out object accObj);
+                        if (hr == 0 && accObj is Accessibility.IAccessible acc)
+                        {
+                            object[] children = new object[acc.accChildCount];
+                            AccessibleChildren(acc, 0, acc.accChildCount, children, out int obtained);
+                            int curIdx = 1;
+                            for (int i = 0; i < obtained; i++)
+                            {
+                                string name = "";
+                                try { name = acc.get_accName(children[i]) ?? ""; } catch { }
+                                string role = "";
+                                try { role = acc.get_accRole(children[i])?.ToString() ?? ""; } catch { }
+                                if (!string.IsNullOrWhiteSpace(name) || role.Contains("43") || role.Contains("push"))
+                                {
+                                    if (curIdx == btnIndex)
+                                    {
+                                        acc.accDoDefaultAction(children[i]);
+                                        return $"OK:已MSAA点击 [{controlName}] ({name})";
+                                    }
+                                    curIdx++;
+                                }
+                            }
+                        }
+                        return $"ERR:MSAA未找到第 {btnIndex} 个按钮";
+                    }
+                    catch (Exception ex) { return $"ERR:MSAA点击失败 {ex.Message}"; }
+                }
+
+                // UIA_ 前缀: 用 InvokePattern 或坐标点击
+                try
+                {
+                    var el = FindUiaVirtualControl(window, controlName);
+                    if (!el.Current.IsEnabled) return "ERR:Control disabled";
+                    try {
+                        ((InvokePattern)el.GetCurrentPattern(InvokePattern.Pattern)).Invoke();
+                        return $"OK:已原生虚拟点击 [{controlName}]";
+                    } catch {
+                        var uiaRect = el.Current.BoundingRectangle;
+                        System.Drawing.Point uiaPt = new System.Drawing.Point((int)(uiaRect.Left + uiaRect.Width/2), (int)(uiaRect.Top + uiaRect.Height/2));
+                        System.Windows.Forms.Cursor.Position = uiaPt; Thread.Sleep(50);
+                        mouse_event(MOUSEEVENTF_LEFTDOWN, uiaPt.X, uiaPt.Y, 0, 0); Thread.Sleep(50);
+                        mouse_event(MOUSEEVENTF_LEFTUP, uiaPt.X, uiaPt.Y, 0, 0);
+                        return $"OK:已虚拟坐标点击 [{controlName}]";
+                    }
+                }
+                catch (Exception ex) { return $"ERR:{ex.Message}"; }
             }
             
             IntPtr ctrl = FindControl(window, controlName);
@@ -354,13 +410,13 @@ namespace GnwayAgent
         }
         static string DoExists(IntPtr window, string[] parts)
         {
-            if (parts[2].Contains("<UIA_")) { try { FindUiaVirtualControl(window, parts[2]); return "OK:true"; } catch { return "OK:false"; } }
+            if (parts[2].Contains("<UIA_") || parts[2].Contains("<TB_") || parts[2].Contains("<MSAA_")) { try { FindUiaVirtualControl(window, parts[2]); return "OK:true"; } catch { return "OK:false"; } }
             try { FindControl(window, parts[2]); return "OK:true"; }
             catch { return "OK:false"; }
         }
         static string DoIsEnabled(IntPtr window, string[] parts)
         {
-            if (parts[2].Contains("<UIA_")) { return FindUiaVirtualControl(window, parts[2]).Current.IsEnabled ? "OK:true" : "OK:false"; }
+            if (parts[2].Contains("<UIA_") || parts[2].Contains("<TB_") || parts[2].Contains("<MSAA_")) { return FindUiaVirtualControl(window, parts[2]).Current.IsEnabled ? "OK:true" : "OK:false"; }
             IntPtr ctrl = FindControl(window, parts[2]);
             return IsWindowEnabled(ctrl) ? "OK:true" : "OK:false";
         }
@@ -704,6 +760,7 @@ namespace GnwayAgent
         const uint MOUSEEVENTF_LEFTUP = 0x0004;
         const uint TB_BUTTONCOUNT = 0x0418;
         const uint TB_GETBUTTONTEXTW = 0x044B;
+        const uint TB_PRESSBUTTON = 0x0403;
         const uint OBJID_CLIENT = 0xFFFFFFFC;
 
         [DllImport("user32.dll", CharSet = CharSet.Auto)]
