@@ -287,14 +287,31 @@ namespace GnwayAgent
                 IntPtr parentHwnd = FindControl(window, parentMagic);
                 if (parentHwnd == IntPtr.Zero) return $"ERR:找不到宿主工具栏 {parentMagic}";
 
-                // TB_ 前缀: 用 Win32 TB_PRESSBUTTON 消息直接按下
+                // TB_ 前缀: 读取目标进程 RECT 后执行物理坐标点击
                 if (controlName.Contains("<TB_"))
                 {
-                    // 先获取按钮的 Command ID
-                    SendMessage(parentHwnd, TB_PRESSBUTTON, (IntPtr)(btnIndex - 1), (IntPtr)1);
-                    Thread.Sleep(100);
-                    SendMessage(parentHwnd, TB_PRESSBUTTON, (IntPtr)(btnIndex - 1), (IntPtr)0);
-                    return $"OK:已按下工具栏按钮 [{controlName}]";
+                    int idx = btnIndex - 1;
+                    RECT btnRect = GetToolbarButtonRect(parentHwnd, idx);
+                    if (btnRect.Right > btnRect.Left) // 有效的包围盒
+                    {
+                        System.Drawing.Point pt = new System.Drawing.Point(
+                            btnRect.Left + (btnRect.Right - btnRect.Left) / 2,
+                            btnRect.Top + (btnRect.Bottom - btnRect.Top) / 2
+                        );
+                        ClientToScreen(parentHwnd, ref pt);
+                        System.Windows.Forms.Cursor.Position = pt; Thread.Sleep(50);
+                        mouse_event(MOUSEEVENTF_LEFTDOWN, pt.X, pt.Y, 0, 0); Thread.Sleep(50);
+                        mouse_event(MOUSEEVENTF_LEFTUP, pt.X, pt.Y, 0, 0);
+                        return $"OK:已物理点击工具栏按钮 [{controlName}]";
+                    }
+                    else
+                    {
+                        // 兜底发消息 (通常此项只会有动画效果，不会触发回调)
+                        SendMessage(parentHwnd, TB_PRESSBUTTON, (IntPtr)idx, (IntPtr)1);
+                        Thread.Sleep(100);
+                        SendMessage(parentHwnd, TB_PRESSBUTTON, (IntPtr)idx, (IntPtr)0);
+                        return $"OK:跨进程注入失败，已执行兜底压键 [{controlName}]";
+                    }
                 }
 
                 // MSAA_ 前缀: 用 IAccessible.accDoDefaultAction
@@ -783,9 +800,64 @@ namespace GnwayAgent
         const uint TB_GETBUTTONTEXTW = 0x044B;
         const uint TB_PRESSBUTTON = 0x0403;
         const uint OBJID_CLIENT = 0xFFFFFFFC;
+        
+        const uint PROCESS_VM_OPERATION = 0x0008;
+        const uint PROCESS_VM_READ = 0x0010;
+        const uint PROCESS_VM_WRITE = 0x0020;
+        const uint MEM_RESERVE = 0x2000;
+        const uint MEM_COMMIT = 0x1000;
+        const uint PAGE_READWRITE = 0x04;
+        const uint MEM_RELEASE = 0x8000;
+        const uint TB_GETITEMRECT = 0x041D;
 
         [DllImport("user32.dll", CharSet = CharSet.Auto)]
         static extern IntPtr SendMessage(IntPtr hWnd, uint Msg, IntPtr wParam, StringBuilder lParam);
+
+        [DllImport("user32.dll")]
+        static extern bool ClientToScreen(IntPtr hWnd, ref System.Drawing.Point lpPoint);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        static extern IntPtr OpenProcess(uint processAccess, bool bInheritHandle, int processId);
+        [DllImport("kernel32.dll", SetLastError = true)]
+        static extern IntPtr VirtualAllocEx(IntPtr hProcess, IntPtr lpAddress, uint dwSize, uint flAllocationType, uint flProtect);
+        [DllImport("kernel32.dll", SetLastError = true)]
+        static extern bool VirtualFreeEx(IntPtr hProcess, IntPtr lpAddress, uint dwSize, uint dwFreeType);
+        [DllImport("kernel32.dll", SetLastError = true)]
+        static extern bool ReadProcessMemory(IntPtr hProcess, IntPtr lpBaseAddress, out RECT lpBuffer, uint nSize, out IntPtr lpNumberOfBytesRead);
+        [DllImport("user32.dll", SetLastError = true)]
+        static extern uint GetWindowThreadProcessId(IntPtr hWnd, out int processId);
+        [DllImport("kernel32.dll", SetLastError = true)]
+        static extern bool CloseHandle(IntPtr hObject);
+
+        static RECT GetToolbarButtonRect(IntPtr hwnd, int index)
+        {
+            GetWindowThreadProcessId(hwnd, out int pid);
+            IntPtr hProcess = OpenProcess(PROCESS_VM_OPERATION | PROCESS_VM_READ | PROCESS_VM_WRITE, false, pid);
+            if (hProcess == IntPtr.Zero) return new RECT();
+            
+            IntPtr allocatedAddress = VirtualAllocEx(hProcess, IntPtr.Zero, (uint)Marshal.SizeOf(typeof(RECT)), MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+            if (allocatedAddress == IntPtr.Zero) 
+            {
+                CloseHandle(hProcess);
+                return new RECT();
+            }
+
+            try
+            {
+                int res = (int)SendMessage(hwnd, TB_GETITEMRECT, (IntPtr)index, allocatedAddress);
+                if (res != 0)
+                {
+                    ReadProcessMemory(hProcess, allocatedAddress, out RECT rect, (uint)Marshal.SizeOf(typeof(RECT)), out _);
+                    return rect;
+                }
+            }
+            finally
+            {
+                VirtualFreeEx(hProcess, allocatedAddress, 0, MEM_RELEASE);
+                CloseHandle(hProcess);
+            }
+            return new RECT();
+        }
 
         [DllImport("oleacc.dll")]
         static extern int AccessibleObjectFromWindow(IntPtr hwnd, uint dwObjectId, ref Guid riid, [MarshalAs(UnmanagedType.Interface)] out object ppvObject);
