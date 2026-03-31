@@ -197,11 +197,14 @@ namespace GnwayController
             _dgvTree = new DataGridView {
                 Dock = DockStyle.Fill,
                 RowHeadersVisible = false, AllowUserToAddRows = false, AllowUserToDeleteRows = false,
-                AllowUserToResizeRows = false, MultiSelect = false, SelectionMode = DataGridViewSelectionMode.CellSelect,
+                AllowUserToResizeRows = false, AllowUserToResizeColumns = true,
+                MultiSelect = false, SelectionMode = DataGridViewSelectionMode.CellSelect,
                 AutoSizeRowsMode = DataGridViewAutoSizeRowsMode.None, RowTemplate = { Height = 30 },
                 BackgroundColor = C_CARD, BorderStyle = BorderStyle.None, GridColor = C_BORDER, Font = F_SMALL,
                 ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.DisableResizing,
-                ColumnHeadersHeight = 28, EditMode = DataGridViewEditMode.EditOnEnter
+                ColumnHeadersHeight = 28, EditMode = DataGridViewEditMode.EditOnEnter,
+                AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None,
+                ScrollBars = ScrollBars.Both
             };
             _dgvTree.ColumnHeadersDefaultCellStyle.BackColor  = Color.FromArgb(240, 244, 252);
             _dgvTree.ColumnHeadersDefaultCellStyle.Font       = F_SMALL;
@@ -210,11 +213,11 @@ namespace GnwayController
             _dgvTree.DefaultCellStyle.SelectionBackColor = Color.FromArgb(219, 234, 254);
             _dgvTree.DefaultCellStyle.SelectionForeColor = C_TEXT;
 
-            _dgvTree.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "类型", Name = "colType", Width = 140, MinimumWidth = 50, Resizable = DataGridViewTriState.True, ReadOnly = true, SortMode = DataGridViewColumnSortMode.NotSortable });
-            _dgvTree.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "标识码", Name = "colMagicId", Width = 180, MinimumWidth = 60, Resizable = DataGridViewTriState.True, ReadOnly = true, SortMode = DataGridViewColumnSortMode.NotSortable });
-            _dgvTree.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "标题文字", Name = "colText", AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill, MinimumWidth = 80, Resizable = DataGridViewTriState.True, ReadOnly = true, SortMode = DataGridViewColumnSortMode.NotSortable });
-            _dgvTree.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "坐标矩形", Name = "colRect", Width = 160, MinimumWidth = 60, Resizable = DataGridViewTriState.True, ReadOnly = true, SortMode = DataGridViewColumnSortMode.NotSortable });
-            _dgvTree.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "状态", Name = "colEnabled", Width = 40, MinimumWidth = 30, Resizable = DataGridViewTriState.True, ReadOnly = true, SortMode = DataGridViewColumnSortMode.NotSortable });
+            _dgvTree.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "类型", Name = "colType", Width = 140, MinimumWidth = 40, Resizable = DataGridViewTriState.True, AutoSizeMode = DataGridViewAutoSizeColumnMode.None, ReadOnly = true, SortMode = DataGridViewColumnSortMode.NotSortable });
+            _dgvTree.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "标识码", Name = "colMagicId", Width = 200, MinimumWidth = 60, Resizable = DataGridViewTriState.True, AutoSizeMode = DataGridViewAutoSizeColumnMode.None, ReadOnly = true, SortMode = DataGridViewColumnSortMode.NotSortable });
+            _dgvTree.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "标题文字", Name = "colText", Width = 200, MinimumWidth = 60, Resizable = DataGridViewTriState.True, AutoSizeMode = DataGridViewAutoSizeColumnMode.None, ReadOnly = true, SortMode = DataGridViewColumnSortMode.NotSortable });
+            _dgvTree.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "坐标矩形", Name = "colRect", Width = 160, MinimumWidth = 40, Resizable = DataGridViewTriState.True, AutoSizeMode = DataGridViewAutoSizeColumnMode.None, ReadOnly = true, SortMode = DataGridViewColumnSortMode.NotSortable });
+            _dgvTree.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "状态", Name = "colEnabled", Width = 40, MinimumWidth = 30, Resizable = DataGridViewTriState.True, AutoSizeMode = DataGridViewAutoSizeColumnMode.None, ReadOnly = true, SortMode = DataGridViewColumnSortMode.NotSortable });
             
             var colAct = new DataGridViewComboBoxColumn { HeaderText = "操作", Name = "colAction", Width = 85, DisplayStyle = DataGridViewComboBoxDisplayStyle.ComboBox, SortMode = DataGridViewColumnSortMode.NotSortable };
             colAct.Items.AddRange("click", "input", "select", "gridnext", "popupclick", "sleep");
