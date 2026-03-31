@@ -221,7 +221,7 @@ namespace GnwayAgent
 
         static IntPtr FindControl(IntPtr window, string controlName)
         {
-            var match = Regex.Match(controlName, @"^<([A-Za-z0-9_]+)(\d+)>$");
+            var match = Regex.Match(controlName, @"<([A-Za-z0-9_]+?)(\d+)>");
             if (match.Success)
             {
                 string targetClass = match.Groups[1].Value.ToLower();
