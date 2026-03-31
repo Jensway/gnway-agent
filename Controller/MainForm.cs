@@ -157,7 +157,7 @@ namespace GnwayController
             };
             Controls.Add(split);
             split.BringToFront(); // [!!! FIX MANGLED FORM LAYOUT OVERLAP !!!]
-            this.Load += (_, __) => split.SplitterDistance = (int)(ClientSize.Width * 0.40);
+            this.Load += (_, __) => split.SplitterDistance = (int)(ClientSize.Width * 0.55);
 
             BuildLeftPanel(split.Panel1);
             BuildRightPanel(split.Panel2);
@@ -208,16 +208,16 @@ namespace GnwayController
             _dgvTree.DefaultCellStyle.SelectionBackColor = Color.FromArgb(219, 234, 254);
             _dgvTree.DefaultCellStyle.SelectionForeColor = C_TEXT;
 
-            _dgvTree.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "类型", Name = "colType", Width = 90, ReadOnly = true, SortMode = DataGridViewColumnSortMode.NotSortable });
-            _dgvTree.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "控件名称", Name = "colName", AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill, ReadOnly = true, SortMode = DataGridViewColumnSortMode.NotSortable });
+            _dgvTree.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "类型", Name = "colType", Width = 150, ReadOnly = true, SortMode = DataGridViewColumnSortMode.NotSortable });
+            _dgvTree.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "控件名称", Name = "colName", AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill, MinimumWidth = 150, ReadOnly = true, SortMode = DataGridViewColumnSortMode.NotSortable });
             _dgvTree.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "状态", Name = "colEnabled", Width = 40, ReadOnly = true, SortMode = DataGridViewColumnSortMode.NotSortable });
             
-            var colAct = new DataGridViewComboBoxColumn { HeaderText = "操作", Name = "colAction", Width = 70, DisplayStyle = DataGridViewComboBoxDisplayStyle.ComboBox, SortMode = DataGridViewColumnSortMode.NotSortable };
+            var colAct = new DataGridViewComboBoxColumn { HeaderText = "操作", Name = "colAction", Width = 85, DisplayStyle = DataGridViewComboBoxDisplayStyle.ComboBox, SortMode = DataGridViewColumnSortMode.NotSortable };
             colAct.Items.AddRange("click", "input", "select", "gridnext", "popupclick", "sleep");
             colAct.DefaultCellStyle.BackColor = Color.FromArgb(245, 245, 245);
             _dgvTree.Columns.Add(colAct);
 
-            var colVal = new DataGridViewTextBoxColumn { HeaderText = "测试值", Name = "colValue", Width = 90, SortMode = DataGridViewColumnSortMode.NotSortable };
+            var colVal = new DataGridViewTextBoxColumn { HeaderText = "测试值", Name = "colValue", Width = 140, SortMode = DataGridViewColumnSortMode.NotSortable };
             colVal.DefaultCellStyle.BackColor = Color.LightYellow;
             _dgvTree.Columns.Add(colVal);
 
