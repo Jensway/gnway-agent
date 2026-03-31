@@ -64,7 +64,6 @@ namespace GnwayController
         // 右上：事件列表
         ListView       _lvEvents   = null!;
         Button         _btnEvtTest = null!;
-        Button         _btnEvtSave = null!;
         Button         _btnEvtDel  = null!;
         Button         _btnEvtUp   = null!;
         Button         _btnEvtDown = null!;
@@ -293,7 +292,7 @@ namespace GnwayController
                 Panel1MinSize = 140
             };
             panel.Controls.Add(rightSplit);
-            this.Load += (_, __) => rightSplit.SplitterDistance = 200;
+            this.Load += (_, __) => rightSplit.SplitterDistance = 240;
 
             BuildEventsPanel(rightSplit.Panel1);
             BuildFlowPanel(rightSplit.Panel2);
@@ -392,8 +391,7 @@ namespace GnwayController
             };
             panel.Controls.Add(innerSplit);
             this.Load += (_, __) => {
-                rightSplit.SplitterDistance = 240;
-                innerSplit.SplitterDistance = (int)(rightSplit.Panel2.Width * 0.50);
+                innerSplit.SplitterDistance = (int)(innerSplit.Width * 0.50);
             };
 
             // ── 左半：流程步骤列表 ────────────────────────────
@@ -645,7 +643,7 @@ namespace GnwayController
                 if (string.IsNullOrWhiteSpace(stepName)) return;
 
                 var evt = new AutoEvent {
-                    Id = EventStore.NewId(), Name = stepName.Trim(), WindowName = win,
+                    Id = EventStore.NewId(), Name = stepName!.Trim(), WindowName = win,
                     Snapshot = new ControlSnapshot(), Action = action
                 };
                 _store.Save(evt);
