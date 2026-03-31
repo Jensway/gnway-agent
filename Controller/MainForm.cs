@@ -161,10 +161,14 @@ namespace GnwayController
 
             toolbar.Controls.Add(Lbl("目标窗口（可用下拉或模糊匹配）", toolbar, new Point(x, 8)));
             _tbWindow = new ComboBox {
-                Text = "", Width = 280, Location = new Point(x, 26),
+                Text = "", Width = 210, Location = new Point(x, 26),
                 Font = F_BODY, DropDownStyle = ComboBoxStyle.DropDown
             };
-            toolbar.Controls.Add(_tbWindow); x += 292;
+            toolbar.Controls.Add(_tbWindow); x += 218;
+
+            var btnGetWins = Btn("▼ 获取", toolbar, new Point(x, 24), 60, C_CARD, C_TEXT);
+            btnGetWins.Click += OnGetWindows;
+            toolbar.Controls.Add(btnGetWins); x += 68;
 
             _btnRefresh = Btn("🔄 刷新控件树", toolbar, new Point(x, 24), 110, C_BG, C_TEXT);
             _btnRefresh.Click += OnRefreshTree;
@@ -489,6 +493,44 @@ namespace GnwayController
                 _lblConn.Text = "✗ 连接失败";
             }
             _btnTest.Enabled = true;
+        }
+
+        private async void OnGetWindows(object? s, EventArgs e)
+        {
+            var btn = s as Button;
+            if (btn != null) btn.Enabled = false;
+
+            string server = _tbServer.Text.Trim();
+            var client = new AgentClient(server, timeoutMs: 8000);
+            
+            try 
+            {
+                string r = await Task.Run(() => client.Send("snapshot"));
+                if (r.StartsWith("OK"))
+                {
+                    string[] wins = r.Length > 3
+                        ? r.Substring(3).Split(new[] { "|||" }, StringSplitOptions.RemoveEmptyEntries)
+                        : Array.Empty<string>();
+
+                    _tbWindow.Items.Clear();
+                    _tbWindow.Items.AddRange(wins);
+                    if (wins.Length > 0 && string.IsNullOrWhiteSpace(_tbWindow.Text))
+                        _tbWindow.SelectedIndex = 0;
+
+                    if (_tbWindow.Items.Count > 0)
+                        _tbWindow.DroppedDown = true;
+                }
+                else
+                {
+                    MessageBox.Show("获取窗口列表失败: " + r, "错误", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("网络或引擎错误: " + ex.Message, "错误", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+
+            if (btn != null) btn.Enabled = true;
         }
 
         private async void OnRefreshTree(object? s, EventArgs e)
