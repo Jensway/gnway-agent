@@ -121,17 +121,7 @@ namespace GnwayController
             BackColor     = C_BG;
             Font          = F_BODY;
 
-            // ── 顶部标题栏 ───────────────────────────────────
-            var hdr = new Panel { Dock = DockStyle.Top, Height = 48, BackColor = C_HDR_BG };
-            var lblT = new Label {
-                Text = "⚙  GnwayAgent  自动化录制执行平台",
-                Font = F_TITLE, ForeColor = Color.White,
-                AutoSize = false, TextAlign = ContentAlignment.MiddleLeft,
-                Location = new Point(12, 0), Size = new Size(320, 48),
-                BackColor = Color.Transparent
-            };
-            hdr.Controls.Add(lblT);
-            Controls.Add(hdr);
+            // (The custom header panel has been removed to avoid redundancy with the native window title bar)
 
             // ── 工具栏 ───────────────────────────────────────
             var toolbar = new Panel {
