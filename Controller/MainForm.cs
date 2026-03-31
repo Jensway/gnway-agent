@@ -210,10 +210,10 @@ namespace GnwayController
             _dgvTree.DefaultCellStyle.SelectionBackColor = Color.FromArgb(219, 234, 254);
             _dgvTree.DefaultCellStyle.SelectionForeColor = C_TEXT;
 
-            _dgvTree.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "类型", Name = "colType", Width = 140, ReadOnly = true, SortMode = DataGridViewColumnSortMode.NotSortable });
-            _dgvTree.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "标识码", Name = "colMagicId", Width = 150, ReadOnly = true, SortMode = DataGridViewColumnSortMode.NotSortable });
+            _dgvTree.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "类型", Name = "colType", AutoSizeMode = DataGridViewAutoSizeColumnMode.DisplayedCells, MinimumWidth = 80, ReadOnly = true, SortMode = DataGridViewColumnSortMode.NotSortable });
+            _dgvTree.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "标识码", Name = "colMagicId", AutoSizeMode = DataGridViewAutoSizeColumnMode.DisplayedCells, MinimumWidth = 80, ReadOnly = true, SortMode = DataGridViewColumnSortMode.NotSortable });
             _dgvTree.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "标题文字", Name = "colText", AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill, MinimumWidth = 100, ReadOnly = true, SortMode = DataGridViewColumnSortMode.NotSortable });
-            _dgvTree.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "坐标矩形", Name = "colRect", Width = 100, ReadOnly = true, SortMode = DataGridViewColumnSortMode.NotSortable });
+            _dgvTree.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "坐标矩形", Name = "colRect", AutoSizeMode = DataGridViewAutoSizeColumnMode.DisplayedCells, MinimumWidth = 80, ReadOnly = true, SortMode = DataGridViewColumnSortMode.NotSortable });
             _dgvTree.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "状态", Name = "colEnabled", Width = 40, ReadOnly = true, SortMode = DataGridViewColumnSortMode.NotSortable });
             
             var colAct = new DataGridViewComboBoxColumn { HeaderText = "操作", Name = "colAction", Width = 85, DisplayStyle = DataGridViewComboBoxDisplayStyle.ComboBox, SortMode = DataGridViewColumnSortMode.NotSortable };

@@ -23,6 +23,7 @@ namespace GnwayAgent
     {
         static void Main(string[] args)
         {
+            Console.OutputEncoding = System.Text.Encoding.UTF8;
             int port = 19090;
             if (args.Length > 0 && int.TryParse(args[0], out int p)) port = p;
 
@@ -175,7 +176,7 @@ namespace GnwayAgent
                 if (action == "windowexists") return FindWindowByTitle(appTitle) != IntPtr.Zero ? "OK:true" : "OK:false";
 
                 IntPtr window = FindWindowByTitle(appTitle);
-                if (window == IntPtr.Zero) throw new Exception($"鎵句笉鍒扮獥鍙? {appTitle}");
+                if (window == IntPtr.Zero) throw new Exception($"Window not found: {appTitle}");
 
                 if (action == "listcontrols" || action == "tree")
                 {
@@ -196,7 +197,7 @@ namespace GnwayAgent
                     "gridselect" => DoGridSelect(window, parts),
                     "focus"      => DoFocus(window, parts),
                     "wait"       => DoWait(appTitle, parts),
-                    _            => $"ERR:鏈煡鍔ㄤ綔 [{action}]"
+                    _            => $"ERR:Unknown action [{action}]"
                 };
             }
             catch (Exception ex) { return $"ERR:{ex.Message}"; }
@@ -251,7 +252,7 @@ namespace GnwayAgent
                 }
                 
                 if (WalkForMagicName(window)) return targetElement;
-                throw new Exception($"鏈兘鎵撴崬鍑虹粷瀵瑰潗鏍囧尮閰嶇殑鎺т欢: {controlName}");
+                throw new Exception($"Failed to find control by absolute cord: {controlName}");
             }
 
             // Fallback: 妯＄硦鍖归厤鏍戜腑鎵€鏈夌殑鍙敤鍚嶇О
@@ -273,7 +274,7 @@ namespace GnwayAgent
             }
             if (FallbackWalk(window)) return fallbackMatch;
 
-            throw new Exception($"鏈彂鐜板彲鐢ㄦ帶浠? [{controlName}]");
+            throw new Exception($"Control not found: [{controlName}]");
         }
         static string DoClick(IntPtr window, string[] parts)
         {
@@ -281,7 +282,7 @@ namespace GnwayAgent
             if (controlName.Contains("<UIA_"))
             {
                 var el = FindUiaVirtualControl(window, controlName);
-                if (!el.Current.IsEnabled) return "ERR:控件不可用";
+                if (!el.Current.IsEnabled) return "ERR:Control disabled";
                 try {
                     ((InvokePattern)el.GetCurrentPattern(InvokePattern.Pattern)).Invoke();
                     return $"OK:已原生虚拟点击 [{controlName}]";
@@ -311,7 +312,7 @@ namespace GnwayAgent
             // 鍙戦€?BM_CLICK
             SendMessage(ctrl, BM_CLICK, IntPtr.Zero, IntPtr.Zero);
             
-            return $"OK:宸插師鐢熺偣鍑?[{controlName}]";
+            return $"OK:Clicked [{controlName}]";
         }
 
         static string DoInput(IntPtr window, string[] parts)
@@ -329,7 +330,7 @@ namespace GnwayAgent
             System.Windows.Forms.SendKeys.SendWait("{DELETE}");
             System.Windows.Forms.SendKeys.SendWait(text);
             
-            return $"OK:宸茶鍐欐枃鏈?[{text}] -> [{controlName}]";
+            return $"OK:InputText [{text}] -> [{controlName}]";
         }
 
         static string DoGetText(IntPtr window, string[] parts)
@@ -344,13 +345,13 @@ namespace GnwayAgent
             string option = parts[3];
             
             int index = (int)SendMessageString(ctrl, CB_FINDSTRINGEXACT, (IntPtr)(-1), option);
-            if (index == CB_ERR) return $"ERR:鏈壘鍒伴€夐」 {option}";
+            if (index == CB_ERR) return $"ERR:OptionNotFound {option}";
             SendMessage(ctrl, CB_SETCURSEL, (IntPtr)index, IntPtr.Zero);
             IntPtr parent = GetParent(ctrl);
             int ctrlId = GetWindowLong(ctrl, GWL_ID);
             SendMessage(parent, WM_COMMAND, (IntPtr)((CBN_SELCHANGE << 16) | ctrlId), ctrl);
             
-            return $"OK:宸查€夋嫨 [{option}]";
+            return $"OK:Selected [{option}]";
         }
         static string DoExists(IntPtr window, string[] parts)
         {
@@ -377,15 +378,15 @@ namespace GnwayAgent
                 if (dialog != IntPtr.Zero) break;
                 Thread.Sleep(300);
             }
-            if (dialog == IntPtr.Zero) return $"ERR:绛夊緟寮圭獥瓒呮椂 [{dialogTitle}]";
-            return $"OK:寮圭獥鍑虹幇";
+            if (dialog == IntPtr.Zero) return $"ERR:TimeoutWaitWindow [{dialogTitle}]";
+            return $"OK:WindowAppeared";
         }
 
         static string DoFocus(IntPtr window, string[] parts)
         {
             IntPtr ctrl = FindControl(window, parts[2]);
             SetFocus(ctrl);
-            return $"OK:宸蹭娇鎺т欢鑾峰緱鐒︾偣";
+            return $"OK:Focused";
         }
 
         // =====================================================
@@ -564,7 +565,7 @@ namespace GnwayAgent
                 GetWindowRect(child, out RECT rect);
                 int w = rect.Right - rect.Left;
                 
-                string displayRect = visible && w > 0 ? $"[{rect.Left},{rect.Top}瀹?{w}]" : (visible ? "" : "{闅恾");
+                string displayRect = visible && w > 0 ? $"[{rect.Left},{rect.Top} Width:{w}]" : (visible ? "" : "{Hidden}");
                 
                 // 鐧藉櫔闊冲瀮鍦惧鍣ㄨ繃婊?(浠呴檺娌℃湁鏄剧ず鏍囬鐨勯€忔槑/瑁呴グ绫?
                 bool isNoise = string.IsNullOrWhiteSpace(text) && (
