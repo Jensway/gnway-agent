@@ -220,7 +220,7 @@ namespace GnwayController
             _dgvTree.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "状态", Name = "colEnabled", Width = 40, MinimumWidth = 30, Resizable = DataGridViewTriState.True, AutoSizeMode = DataGridViewAutoSizeColumnMode.None, ReadOnly = true, SortMode = DataGridViewColumnSortMode.NotSortable });
             
             var colAct = new DataGridViewComboBoxColumn { HeaderText = "操作", Name = "colAction", Width = 85, DisplayStyle = DataGridViewComboBoxDisplayStyle.ComboBox, SortMode = DataGridViewColumnSortMode.NotSortable };
-            colAct.Items.AddRange("click", "input", "select", "gridnext", "popupclick", "sleep");
+            colAct.Items.AddRange("click", "input", "sendkeys", "select", "gridnext", "popupclick", "sleep");
             colAct.DefaultCellStyle.BackColor = Color.FromArgb(245, 245, 245);
             _dgvTree.Columns.Add(colAct);
 
@@ -315,7 +315,7 @@ namespace GnwayController
             quickBar.Controls.Add(tbCtrl); qx += 116;
             
             var cbAct = new ComboBox { Width = 70, Location = new Point(qx, 9), DropDownStyle = ComboBoxStyle.DropDownList };
-            cbAct.Items.AddRange(new[] { "click", "input", "select" }); cbAct.SelectedIndex = 0;
+            cbAct.Items.AddRange(new[] { "click", "input", "sendkeys", "select" }); cbAct.SelectedIndex = 0;
             quickBar.Controls.Add(cbAct); qx += 76;
             
             var tbVal = new TextBox { Width = 90, Location = new Point(qx, 10), Font = F_BODY };
