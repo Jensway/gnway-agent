@@ -204,7 +204,8 @@ namespace GnwayController
                 ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.DisableResizing,
                 ColumnHeadersHeight = 28, EditMode = DataGridViewEditMode.EditOnEnter,
                 AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None,
-                ScrollBars = ScrollBars.Both
+                ScrollBars = ScrollBars.Both,
+                ClipboardCopyMode = DataGridViewClipboardCopyMode.EnableWithoutHeaderText
             };
             _dgvTree.ColumnHeadersDefaultCellStyle.BackColor  = Color.FromArgb(240, 244, 252);
             _dgvTree.ColumnHeadersDefaultCellStyle.Font       = F_SMALL;
@@ -351,8 +352,8 @@ namespace GnwayController
             int bx = 4;
             _btnEvtTest = Btn("▶ 测试", btnBar, new Point(bx, 4), 70, C_ACCENT, Color.White); bx += 76;
             _btnEvtTest.Click += OnEvtTest;
-            _btnEvtSave = Btn("💾 另存", btnBar, new Point(bx, 4), 62, C_OK, Color.White); bx += 68;
-            _btnEvtSave.Click += OnEvtResave;
+            var btnEvtEdit = Btn("✎ 编辑", btnBar, new Point(bx, 4), 62, C_OK, Color.White); bx += 68;
+            btnEvtEdit.Click += OnEvtEdit;
             _btnEvtUp   = Btn("↑", btnBar, new Point(bx, 4), 30, C_BG, C_TEXT); bx += 36;
             _btnEvtUp.Click += (_, __) => MoveEvt(-1);
             _btnEvtDown = Btn("↓", btnBar, new Point(bx, 4), 30, C_BG, C_TEXT); bx += 36;
@@ -372,8 +373,9 @@ namespace GnwayController
             };
             _lvEvents.Columns.Add("#",    28);
             _lvEvents.Columns.Add("名称", 140);
-            _lvEvents.Columns.Add("窗口", 160);
-            _lvEvents.Columns.Add("动作",  -2);
+            _lvEvents.Columns.Add("窗口", 200);
+            _lvEvents.Columns.Add("动作", 250);
+            _lvEvents.KeyDown += OnListViewCopy;
             panel.Controls.Add(_lvEvents);
             _lvEvents.BringToFront(); // [!!! FIX MANGLED RIGHT-TOP PANEL (EVENTS LIST) OVERLAP !!!]
         }
@@ -389,7 +391,10 @@ namespace GnwayController
                 Panel1MinSize = 160
             };
             panel.Controls.Add(innerSplit);
-            this.Load += (_, __) => innerSplit.SplitterDistance = 220;
+            this.Load += (_, __) => {
+                rightSplit.SplitterDistance = 240;
+                innerSplit.SplitterDistance = (int)(rightSplit.Panel2.Width * 0.50);
+            };
 
             // ── 左半：流程步骤列表 ────────────────────────────
             SectionHeader("流程步骤", innerSplit.Panel1, DockStyle.Top);
@@ -413,8 +418,9 @@ namespace GnwayController
                 Font = F_SMALL, HeaderStyle = ColumnHeaderStyle.Nonclickable
             };
             _lvSteps.Columns.Add("步",   28);
-            _lvSteps.Columns.Add("事件名", 130);
-            _lvSteps.Columns.Add("窗口",   -2);
+            _lvSteps.Columns.Add("事件名", 140);
+            _lvSteps.Columns.Add("窗口",   200);
+            _lvSteps.KeyDown += OnListViewCopy;
             innerSplit.Panel1.Controls.Add(_lvSteps);
             _lvSteps.BringToFront(); // [!!! FIX MANGLED RIGHT-BOTTOM-LEFT PANEL (FLOW STEPS) OVERLAP !!!]
 
@@ -774,20 +780,69 @@ namespace GnwayController
             AppendLog(r, r.StartsWith("OK") ? C_OK : C_ERR);
         }
 
-        private void OnEvtResave(object? s, EventArgs e)
+        private void OnEvtEdit(object? s, EventArgs e)
         {
-            // 仅重命名事件
             if (_lvEvents.SelectedItems.Count == 0) return;
             string id = _lvEvents.SelectedItems[0].Tag?.ToString() ?? "";
             var ev = _allEvents.FirstOrDefault(x => x.Id == id);
             if (ev == null) return;
 
-            string? name = PromptInput("重命名事件", "新名称：", ev.Name);
-            if (!string.IsNullOrWhiteSpace(name))
+            using var dlg = new Form {
+                Text = "✎ 编辑事件匹配规则", Size = new Size(380, 260),
+                FormBorderStyle = FormBorderStyle.FixedDialog, StartPosition = FormStartPosition.CenterParent
+            };
+
+            var lblW = new Label { Text = "目标窗口:", Location = new Point(12, 12), AutoSize = true };
+            var tbW  = new TextBox { Text = ev.WindowName, Location = new Point(80, 10), Width = 260 };
+            
+            var lblC = new Label { Text = "控件名称:", Location = new Point(12, 42), AutoSize = true };
+            var tbC  = new TextBox { Text = ev.Action.ControlName, Location = new Point(80, 40), Width = 260 };
+            
+            var lblA = new Label { Text = "动作类型:", Location = new Point(12, 72), AutoSize = true };
+            var cbA  = new ComboBox { Location = new Point(80, 70), Width = 260, DropDownStyle = ComboBoxStyle.DropDownList };
+            cbA.Items.AddRange(new object[] { "click", "popupclick", "input", "sendkeys", "gettext", "select", "gridnext", "sleep" });
+            cbA.Text = ev.Action.Type;
+            
+            var lblV = new Label { Text = "输入测试值:", Location = new Point(12, 102), AutoSize = true };
+            var tbV  = new TextBox { Text = ev.Action.Value, Location = new Point(80, 100), Width = 260 };
+            
+            var lblN = new Label { Text = "步骤名:", Location = new Point(12, 132), AutoSize = true };
+            var tbN  = new TextBox { Text = ev.Name, Location = new Point(80, 130), Width = 260 };
+
+            var btnOk = new Button { Text = "保存更新", DialogResult = DialogResult.OK, Location = new Point(150, 175), Width = 90 };
+            var btnCn = new Button { Text = "取消", DialogResult = DialogResult.Cancel, Location = new Point(250, 175), Width = 90 };
+
+            dlg.Controls.AddRange(new Control[] { lblW, tbW, lblC, tbC, lblA, cbA, lblV, tbV, lblN, tbN, btnOk, btnCn });
+            dlg.AcceptButton = btnOk; dlg.CancelButton = btnCn;
+
+            if (dlg.ShowDialog() == DialogResult.OK)
             {
-                ev.Name = name.Trim();
+                ev.Name = tbN.Text.Trim();
+                ev.WindowName = tbW.Text.Trim(); // 用户可在此截断后半截带有随机单号的名字
+                ev.Action.Type = cbA.Text;
+                ev.Action.ControlName = tbC.Text.Trim();
+                ev.Action.Value = tbV.Text.Trim();
+                ev.Action.MatchText = tbV.Text.Trim();
                 _store.Save(ev);
                 ReloadEvents();
+            }
+        }
+
+        private void OnListViewCopy(object? sender, KeyEventArgs e)
+        {
+            if (e.Control && e.KeyCode == Keys.C)
+            {
+                var lv = sender as ListView;
+                if (lv != null && lv.SelectedItems.Count > 0)
+                {
+                    var sb = new System.Text.StringBuilder();
+                    foreach (ListViewItem item in lv.SelectedItems)
+                    {
+                        var row = string.Join("\t", item.SubItems.Cast<ListViewItem.ListViewSubItem>().Select(x => x.Text));
+                        sb.AppendLine(row);
+                    }
+                    Clipboard.SetText(sb.ToString().TrimEnd());
+                }
             }
         }
 

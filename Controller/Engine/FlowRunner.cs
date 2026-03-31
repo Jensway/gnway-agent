@@ -118,6 +118,8 @@ namespace GnwayController.Engine
                     {
                         // ── 执行动作 ───────────────────────────
                         bool done = ExecuteAction(evt);
+                        Thread.Sleep(800); // 增加强制等待，增强下移一行或点击后的状态转移稳健性
+
                         if (done)
                         {
                             Emit(EngineEventType.Completed,
