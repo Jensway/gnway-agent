@@ -58,6 +58,8 @@ namespace GnwayController
         DataGridView   _dgvTree    = null!;
         Label          _lblTreeSt  = null!;
         RichTextBox    _rtTestOut  = null!;
+        TabControl     _tcTest     = null!;
+        DataGridView   _dgvTestOut = null!;
 
         // 右上：事件列表
         ListView       _lvEvents   = null!;
@@ -87,7 +89,7 @@ namespace GnwayController
         FlowRunner?        _runner;
 
         // 当前控件树数据（type/name/enabled列表）
-        List<(string Type, string Name, bool Enabled)> _treeData = new();
+        List<ControlInfo> _treeData = new();
 
         // =====================================================
         public MainForm()
@@ -208,8 +210,10 @@ namespace GnwayController
             _dgvTree.DefaultCellStyle.SelectionBackColor = Color.FromArgb(219, 234, 254);
             _dgvTree.DefaultCellStyle.SelectionForeColor = C_TEXT;
 
-            _dgvTree.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "类型", Name = "colType", Width = 150, ReadOnly = true, SortMode = DataGridViewColumnSortMode.NotSortable });
-            _dgvTree.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "控件名称", Name = "colName", AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill, MinimumWidth = 150, ReadOnly = true, SortMode = DataGridViewColumnSortMode.NotSortable });
+            _dgvTree.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "类型", Name = "colType", Width = 140, ReadOnly = true, SortMode = DataGridViewColumnSortMode.NotSortable });
+            _dgvTree.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "标识码", Name = "colMagicId", Width = 150, ReadOnly = true, SortMode = DataGridViewColumnSortMode.NotSortable });
+            _dgvTree.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "标题文字", Name = "colText", AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill, MinimumWidth = 100, ReadOnly = true, SortMode = DataGridViewColumnSortMode.NotSortable });
+            _dgvTree.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "坐标矩形", Name = "colRect", Width = 100, ReadOnly = true, SortMode = DataGridViewColumnSortMode.NotSortable });
             _dgvTree.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "状态", Name = "colEnabled", Width = 40, ReadOnly = true, SortMode = DataGridViewColumnSortMode.NotSortable });
             
             var colAct = new DataGridViewComboBoxColumn { HeaderText = "操作", Name = "colAction", Width = 85, DisplayStyle = DataGridViewComboBoxDisplayStyle.ComboBox, SortMode = DataGridViewColumnSortMode.NotSortable };
@@ -239,16 +243,34 @@ namespace GnwayController
             };
             bottom.Controls.Add(_lblTreeSt);
 
+            _tcTest = new TabControl {
+                Location = new Point(8, 24), Size = new Size(0, 95)
+            };
+            bottom.Resize += (_, __) => _tcTest.Width = bottom.Width - 16;
+            bottom.Controls.Add(_tcTest);
+
+            var tpTxt = new TabPage("日志输出") { BackColor = C_CARD };
+            _tcTest.TabPages.Add(tpTxt);
+            var tpGrid = new TabPage("数据网格") { BackColor = C_CARD };
+            _tcTest.TabPages.Add(tpGrid);
+
             _rtTestOut = new RichTextBox {
-                Location = new Point(8, 24), Size = new Size(0, 90), BackColor = Color.FromArgb(20, 24, 36),
+                Dock = DockStyle.Fill, BackColor = Color.FromArgb(20, 24, 36),
                 ForeColor = Color.FromArgb(200, 215, 240), Font = F_MONO, BorderStyle = BorderStyle.None,
                 ReadOnly = true, ScrollBars = RichTextBoxScrollBars.Vertical, WordWrap = true
             };
-            bottom.Resize += (_, __) => _rtTestOut.Width = bottom.Width - 16;
-            bottom.Controls.Add(_rtTestOut);
+            tpTxt.Controls.Add(_rtTestOut);
+
+            _dgvTestOut = new DataGridView {
+                Dock = DockStyle.Fill, RowHeadersVisible = false, AllowUserToAddRows = false,
+                AllowUserToDeleteRows = false, ReadOnly = true, BackgroundColor = C_CARD,
+                BorderStyle = BorderStyle.None, Font = F_SMALL,
+                AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.AllCells
+            };
+            tpGrid.Controls.Add(_dgvTestOut);
 
             var btnClearTest = Btn("清空输出", bottom, new Point(8, 122), 70, C_BG, C_SUB);
-            btnClearTest.Click += (_, __) => _rtTestOut.Clear();
+            btnClearTest.Click += (_, __) => { _rtTestOut.Clear(); _dgvTestOut.Columns.Clear(); };
             bottom.Controls.Add(btnClearTest);
 
             _dgvTree.BringToFront(); // 让 Tree 占用剩余空间
@@ -524,11 +546,16 @@ namespace GnwayController
             var controls = EventStore.ParseControlList(result);
             foreach (var c in controls)
             {
-                _treeData.Add((c.Type, c.Name, c.Enabled));
+                _treeData.Add(c);
                 string defAction = GetActionLabel(c.Type); // mapped to "click", "input", etc.
                 var row = _dgvTree.Rows[_dgvTree.Rows.Add()];
+                
+                string indent = c.Depth > 0 ? new string(' ', c.Depth * 3) + "└ " : "";
+                
                 row.Cells["colType"].Value    = c.Type;
-                row.Cells["colName"].Value    = c.Name;
+                row.Cells["colMagicId"].Value = c.MagicId;
+                row.Cells["colText"].Value    = indent + c.Text;
+                row.Cells["colRect"].Value    = c.Rect;
                 row.Cells["colEnabled"].Value = c.Enabled ? "✓" : "✗";
                 row.Cells["colAction"].Value  = defAction;
                 row.Cells["colValue"].Value   = "";
@@ -555,7 +582,7 @@ namespace GnwayController
             _dgvTree.EndEdit();
 
             var row     = _dgvTree.Rows[e.RowIndex];
-            string name = row.Cells["colName"].Value?.ToString() ?? "";
+            string name = row.Cells["colMagicId"].Value?.ToString() ?? "";
             string act  = row.Cells["colAction"].Value?.ToString() ?? "click";
             string val  = row.Cells["colValue"].Value?.ToString() ?? "";
             bool enabled= row.Cells["colEnabled"].Value?.ToString() == "✓";
@@ -584,7 +611,16 @@ namespace GnwayController
                 try 
                 {
                     string r = await Task.Run(() => client.Send(cmd));
-                    AppendTest(r, r.StartsWith("OK") ? Color.FromArgb(120, 230, 120) : Color.FromArgb(255, 120, 100));
+                    if (r.StartsWith("OK") && r.Contains("\n") && r.Contains("\t"))
+                    {
+                        RenderTestGrid(r);
+                        _tcTest.SelectedTab = _tcTest.TabPages[1]; // Switch to Grid
+                    }
+                    else
+                    {
+                        AppendTest(r, r.StartsWith("OK") ? Color.FromArgb(120, 230, 120) : Color.FromArgb(255, 120, 100));
+                        _tcTest.SelectedTab = _tcTest.TabPages[0]; // Switch to Text
+                    }
                 }
                 catch (Exception ex) { AppendTest($"通信失败: {ex.Message}", C_ERR); }
             }
@@ -918,6 +954,31 @@ namespace GnwayController
             _rtTestOut.AppendText(text + "\r\n");
             _rtTestOut.SelectionColor  = _rtTestOut.ForeColor;
             _rtTestOut.ScrollToCaret();
+        }
+
+        private void RenderTestGrid(string rawOk)
+        {
+            if (_dgvTestOut.InvokeRequired)
+            { _dgvTestOut.Invoke((Action)(() => RenderTestGrid(rawOk))); return; }
+            
+            _dgvTestOut.Columns.Clear();
+            _dgvTestOut.Rows.Clear();
+            
+            string[] lines = rawOk.Split(new[] { '\n' }, StringSplitOptions.RemoveEmptyEntries);
+            if (lines.Length <= 1) return; // Only OK: or empty
+            
+            // Assume the first data line determines column count
+            string[] firstRowSplit = lines[1].Split('\t');
+            for (int i = 0; i < firstRowSplit.Length; i++)
+            {
+                _dgvTestOut.Columns.Add($"col{i}", $"列 {i+1}");
+            }
+            
+            for (int i = 1; i < lines.Length; i++)
+            {
+                var rowData = lines[i].Split('\t');
+                _dgvTestOut.Rows.Add(rowData);
+            }
         }
 
         // =====================================================

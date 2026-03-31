@@ -32,8 +32,12 @@ namespace GnwayController.Models
     public class ControlInfo
     {
         public string Type    { get; set; } = "";   // Button, TextBox, DataGrid...
-        public string Name    { get; set; } = "";   // 控件名
+        public int    Depth   { get; set; } = 0;
+        public string MagicId { get; set; } = "";
+        public string Text    { get; set; } = "";
+        public string Rect    { get; set; } = "";
         public bool   Enabled { get; set; } = true; // 是否可用
+        public string Name    { get; set; } = "";   // Backward compat
     }
 
     /// <summary>控件树快照</summary>

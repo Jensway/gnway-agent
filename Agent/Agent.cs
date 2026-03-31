@@ -1,7 +1,7 @@
-// =============================================================
-//  GnwayAgent - 服务端 Agent (Native Win32 Edition)
-//  部署到云联服务器，通过命名管道接收命令，操作同 Session 内的程序
-//  基于 EnumChildWindows 实现极速无感知、精准透视的 VB6 提取
+﻿// =============================================================
+//  GnwayAgent - 鏈嶅姟绔?Agent (Native Win32 Edition)
+//  閮ㄧ讲鍒颁簯鑱旀湇鍔″櫒锛岄€氳繃鍛藉悕绠￠亾鎺ユ敹鍛戒护锛屾搷浣滃悓 Session 鍐呯殑绋嬪簭
+//  鍩轰簬 EnumChildWindows 瀹炵幇鏋侀€熸棤鎰熺煡銆佺簿鍑嗛€忚鐨?VB6 鎻愬彇
 // =============================================================
 
 using System;
@@ -26,10 +26,10 @@ namespace GnwayAgent
             int port = 19090;
             if (args.Length > 0 && int.TryParse(args[0], out int p)) port = p;
 
-            Console.WriteLine("=== GnwayAgent 服务端 (Native Win32 极速版) ===");
-            Console.WriteLine($"进程ID: {System.Diagnostics.Process.GetCurrentProcess().Id}");
-            Console.WriteLine($"TCP 端口: {port} (可附加参数启动修改，如: Agent.exe 9090)");
-            Console.WriteLine($"主机名称: {Dns.GetHostName()}");
+            Console.WriteLine("=== GnwayAgent 鏈嶅姟绔?(Native Win32 鏋侀€熺増) ===");
+            Console.WriteLine($"杩涚▼ID: {System.Diagnostics.Process.GetCurrentProcess().Id}");
+            Console.WriteLine($"TCP 绔彛: {port} (鍙檮鍔犲弬鏁板惎鍔ㄤ慨鏀癸紝濡? Agent.exe 9090)");
+            Console.WriteLine($"涓绘満鍚嶇О: {Dns.GetHostName()}");
 
             var tcpThread = new Thread(() =>
             {
@@ -41,31 +41,31 @@ namespace GnwayAgent
                     {
                         using var client = listener.AcceptTcpClient();
                         using var stream = client.GetStream();
-                        var remoteEP = client.Client.RemoteEndPoint?.ToString() ?? "未知IP";
-                        Console.WriteLine($"\n[TCP连接] Controller ({remoteEP}) 已接入！");
+                        var remoteEP = client.Client.RemoteEndPoint?.ToString() ?? "鏈煡IP";
+                        Console.WriteLine($"\n[TCP杩炴帴] Controller ({remoteEP}) 宸叉帴鍏ワ紒");
 
                         var reader = new StreamReader(stream, Encoding.UTF8);
                         var writer = new StreamWriter(stream, Encoding.UTF8) { AutoFlush = true };
 
                         string? cmdLine = reader.ReadLine();
-                        if (string.IsNullOrEmpty(cmdLine)) { writer.WriteLine("ERR:空命令"); continue; }
+                        if (string.IsNullOrEmpty(cmdLine)) { writer.WriteLine("ERR:绌哄懡浠?); continue; }
 
-                        Console.WriteLine($"[收到网络指令] {cmdLine}");
+                        Console.WriteLine($"[鏀跺埌缃戠粶鎸囦护] {cmdLine}");
                         string? result = ProcessCommand(cmdLine, writer);
                         
                         if (result != null)
                         {
                             writer.WriteLine(result);
-                            Console.WriteLine($"[网络返回] {result}");
+                            Console.WriteLine($"[缃戠粶杩斿洖] {result}");
                         }
                         else
                         {
-                            Console.WriteLine($"[网络返回] <流式输出完毕>");
+                            Console.WriteLine($"[缃戠粶杩斿洖] <娴佸紡杈撳嚭瀹屾瘯>");
                         }
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine($"[TCP错误] {ex.Message}");
+                        Console.WriteLine($"[TCP閿欒] {ex.Message}");
                         Thread.Sleep(500);
                     }
                 }
@@ -93,7 +93,7 @@ namespace GnwayAgent
                         string target = windows[menuIndex - 1].Split('|')[0]; // only get handle
                         if (target == "") target = windows[menuIndex - 1]; // fallback
 
-                        Console.WriteLine($"\n========== [拉取全部控件树] {target} ==========");
+                        Console.WriteLine($"\n========== [鎷夊彇鍏ㄩ儴鎺т欢鏍慮 {target} ==========");
                         using var ms = new MemoryStream();
                         using var sw = new StreamWriter(ms, Encoding.UTF8) { AutoFlush = true };
                         ProcessCommand($"listcontrols|{target}", sw);
@@ -104,11 +104,11 @@ namespace GnwayAgent
                         try
                         {
                             File.WriteAllText("agent_dump.txt", fullOutput, Encoding.UTF8);
-                            Console.WriteLine("\n[⭐ 提示] 控件树已保存到 agent_dump.txt");
+                            Console.WriteLine("\n[猸?鎻愮ず] 鎺т欢鏍戝凡淇濆瓨鍒?agent_dump.txt");
                         } catch { }
-                        Console.WriteLine("====================================================\n输入 'm' 刷新");
+                        Console.WriteLine("====================================================\n杈撳叆 'm' 鍒锋柊");
                     }
-                    else Console.WriteLine(">>> 编号无效");
+                    else Console.WriteLine(">>> 缂栧彿鏃犳晥");
                     continue;
                 }
 
@@ -125,10 +125,10 @@ namespace GnwayAgent
                         string output = sr.ReadToEnd();
                         Console.WriteLine(output);
                         File.WriteAllText("agent_dump.txt", output, Encoding.UTF8);
-                        Console.WriteLine("\n[⭐ 提示] 结果已导出至 agent_dump.txt 方便复制！");
+                        Console.WriteLine("\n[猸?鎻愮ず] 缁撴灉宸插鍑鸿嚦 agent_dump.txt 鏂逛究澶嶅埗锛?);
                     }
                 }
-                catch (Exception ex) { Console.WriteLine($"[本地错误] {ex.Message}"); }
+                catch (Exception ex) { Console.WriteLine($"[鏈湴閿欒] {ex.Message}"); }
             }
         }
 
@@ -147,11 +147,11 @@ namespace GnwayAgent
 
         static void PrintMenu()
         {
-            Console.WriteLine("\n==== [Agent 本地懒人调试菜单] ====");
+            Console.WriteLine("\n==== [Agent 鏈湴鎳掍汉璋冭瘯鑿滃崟] ====");
             var list = GetValidWindows();
             for (int i = 0; i < list.Count; i++) Console.WriteLine($" [{i + 1}] {list[i]}");
             Console.WriteLine("==================================");
-            Console.Write("\n请输入数字或指令 (如: m): ");
+            Console.Write("\n璇疯緭鍏ユ暟瀛楁垨鎸囦护 (濡? m): ");
         }
 
         static string? ProcessCommand(string cmdLine, TextWriter writer)
@@ -169,13 +169,13 @@ namespace GnwayAgent
                     return "OK:" + string.Join("|||", wins);
                 }
 
-                if (parts.Length < 2) return "ERR:参数不足（格式: 动作|程序名|...）";
+                if (parts.Length < 2) return "ERR:鍙傛暟涓嶈冻锛堟牸寮? 鍔ㄤ綔|绋嬪簭鍚峾...锛?;
                 string appTitle = parts[1];
 
                 if (action == "windowexists") return FindWindowByTitle(appTitle) != IntPtr.Zero ? "OK:true" : "OK:false";
 
                 IntPtr window = FindWindowByTitle(appTitle);
-                if (window == IntPtr.Zero) throw new Exception($"找不到窗口: {appTitle}");
+                if (window == IntPtr.Zero) throw new Exception($"鎵句笉鍒扮獥鍙? {appTitle}");
 
                 if (action == "listcontrols" || action == "tree")
                 {
@@ -196,14 +196,14 @@ namespace GnwayAgent
                     "gridselect" => DoGridSelect(window, parts),
                     "focus"      => DoFocus(window, parts),
                     "wait"       => DoWait(appTitle, parts),
-                    _            => $"ERR:未知动作 [{action}]"
+                    _            => $"ERR:鏈煡鍔ㄤ綔 [{action}]"
                 };
             }
             catch (Exception ex) { return $"ERR:{ex.Message}"; }
         }
 
         // =====================================================
-        //  Win32 极速操控逻辑
+        //  Win32 鏋侀€熸搷鎺ч€昏緫
         // =====================================================
 
         static IntPtr FindWindowByTitle(string titlePattern)
@@ -251,10 +251,10 @@ namespace GnwayAgent
                 }
                 
                 if (WalkForMagicName(window)) return targetElement;
-                throw new Exception($"未能打捞出绝对坐标匹配的控件: {controlName}");
+                throw new Exception($"鏈兘鎵撴崬鍑虹粷瀵瑰潗鏍囧尮閰嶇殑鎺т欢: {controlName}");
             }
 
-            // Fallback: 模糊匹配树中所有的可用名称
+            // Fallback: 妯＄硦鍖归厤鏍戜腑鎵€鏈夌殑鍙敤鍚嶇О
             IntPtr fallbackMatch = IntPtr.Zero;
             bool FallbackWalk(IntPtr root)
             {
@@ -273,15 +273,31 @@ namespace GnwayAgent
             }
             if (FallbackWalk(window)) return fallbackMatch;
 
-            throw new Exception($"未发现可用控件: [{controlName}]");
+            throw new Exception($"鏈彂鐜板彲鐢ㄦ帶浠? [{controlName}]");
         }
-
         static string DoClick(IntPtr window, string[] parts)
         {
             string controlName = parts[2];
+            if (controlName.Contains("<UIA_"))
+            {
+                var el = FindUiaVirtualControl(window, controlName);
+                if (!el.Current.IsEnabled) return "ERR:控件不可用";
+                try {
+                    ((InvokePattern)el.GetCurrentPattern(InvokePattern.Pattern)).Invoke();
+                    return $"OK:已原生虚拟点击 [{controlName}]";
+                } catch {
+                    var rect = el.Current.BoundingRectangle;
+                    System.Drawing.Point pt = new System.Drawing.Point((int)(rect.Left + rect.Width/2), (int)(rect.Top + rect.Height/2));
+                    System.Windows.Forms.Cursor.Position = pt; Thread.Sleep(50);
+                    mouse_event(MOUSEEVENTF_LEFTDOWN, pt.X, pt.Y, 0, 0); Thread.Sleep(50);
+                    mouse_event(MOUSEEVENTF_LEFTUP, pt.X, pt.Y, 0, 0);
+                    return $"OK:已虚拟坐标点击 [{controlName}]";
+                }
+            }
+            
             IntPtr ctrl = FindControl(window, controlName);
             
-            // 兜底模拟坐标点击
+            // 鍏滃簳妯℃嫙鍧愭爣鐐瑰嚮
             GetWindowRect(ctrl, out RECT rect);
             System.Drawing.Point pt = new System.Drawing.Point(
                 rect.Left + (rect.Right - rect.Left) / 2, 
@@ -292,10 +308,10 @@ namespace GnwayAgent
             Thread.Sleep(50);
             mouse_event(MOUSEEVENTF_LEFTUP, pt.X, pt.Y, 0, 0);
             
-            // 发送 BM_CLICK
+            // 鍙戦€?BM_CLICK
             SendMessage(ctrl, BM_CLICK, IntPtr.Zero, IntPtr.Zero);
             
-            return $"OK:已原生点击 [{controlName}]";
+            return $"OK:宸插師鐢熺偣鍑?[{controlName}]";
         }
 
         static string DoInput(IntPtr window, string[] parts)
@@ -304,17 +320,16 @@ namespace GnwayAgent
             string text = parts.Length > 3 ? parts[3] : "";
             IntPtr ctrl = FindControl(window, controlName);
 
-            // 直接 Win32 霸王硬上弓修改
-            SendMessage(ctrl, WM_SETTEXT, IntPtr.Zero, text);
+            // 鐩存帴 Win32 闇哥帇纭笂寮撲慨鏀?            SendMessage(ctrl, WM_SETTEXT, IntPtr.Zero, text);
             
-            // 兜底 Focus + 键盘输入 (对部分 VB6 拦截修改有用)
+            // 鍏滃簳 Focus + 閿洏杈撳叆 (瀵归儴鍒?VB6 鎷︽埅淇敼鏈夌敤)
             SetFocus(ctrl);
             Thread.Sleep(100);
             System.Windows.Forms.SendKeys.SendWait("^a");
             System.Windows.Forms.SendKeys.SendWait("{DELETE}");
             System.Windows.Forms.SendKeys.SendWait(text);
             
-            return $"OK:已覆写文本 [{text}] -> [{controlName}]";
+            return $"OK:宸茶鍐欐枃鏈?[{text}] -> [{controlName}]";
         }
 
         static string DoGetText(IntPtr window, string[] parts)
@@ -329,23 +344,23 @@ namespace GnwayAgent
             string option = parts[3];
             
             int index = (int)SendMessageString(ctrl, CB_FINDSTRINGEXACT, (IntPtr)(-1), option);
-            if (index == CB_ERR) return $"ERR:未找到选项 {option}";
+            if (index == CB_ERR) return $"ERR:鏈壘鍒伴€夐」 {option}";
             SendMessage(ctrl, CB_SETCURSEL, (IntPtr)index, IntPtr.Zero);
             IntPtr parent = GetParent(ctrl);
             int ctrlId = GetWindowLong(ctrl, GWL_ID);
             SendMessage(parent, WM_COMMAND, (IntPtr)((CBN_SELCHANGE << 16) | ctrlId), ctrl);
             
-            return $"OK:已选择 [{option}]";
+            return $"OK:宸查€夋嫨 [{option}]";
         }
-
         static string DoExists(IntPtr window, string[] parts)
         {
+            if (parts[2].Contains("<UIA_")) { try { FindUiaVirtualControl(window, parts[2]); return "OK:true"; } catch { return "OK:false"; } }
             try { FindControl(window, parts[2]); return "OK:true"; }
             catch { return "OK:false"; }
         }
-
         static string DoIsEnabled(IntPtr window, string[] parts)
         {
+            if (parts[2].Contains("<UIA_")) { return FindUiaVirtualControl(window, parts[2]).Current.IsEnabled ? "OK:true" : "OK:false"; }
             IntPtr ctrl = FindControl(window, parts[2]);
             return IsWindowEnabled(ctrl) ? "OK:true" : "OK:false";
         }
@@ -362,20 +377,19 @@ namespace GnwayAgent
                 if (dialog != IntPtr.Zero) break;
                 Thread.Sleep(300);
             }
-            if (dialog == IntPtr.Zero) return $"ERR:等待弹窗超时 [{dialogTitle}]";
-            return $"OK:弹窗出现";
+            if (dialog == IntPtr.Zero) return $"ERR:绛夊緟寮圭獥瓒呮椂 [{dialogTitle}]";
+            return $"OK:寮圭獥鍑虹幇";
         }
 
         static string DoFocus(IntPtr window, string[] parts)
         {
             IntPtr ctrl = FindControl(window, parts[2]);
             SetFocus(ctrl);
-            return $"OK:已使控件获得焦点";
+            return $"OK:宸蹭娇鎺т欢鑾峰緱鐒︾偣";
         }
 
         // =====================================================
-        // UIA Fallback: 对于网格这种高度虚拟化无句柄的设计，借助 UIA 解析行列表
-        // =====================================================
+        // UIA Fallback: 瀵逛簬缃戞牸杩欑楂樺害铏氭嫙鍖栨棤鍙ユ焺鐨勮璁★紝鍊熷姪 UIA 瑙ｆ瀽琛屽垪琛?        // =====================================================
         static string DoGridRows(IntPtr window, string[] parts)
         {
             IntPtr grid = FindControl(window, parts[2]);
@@ -442,13 +456,13 @@ namespace GnwayAgent
                             Thread.Sleep(50);
                             mouse_event(MOUSEEVENTF_LEFTUP, pt.X, pt.Y, 0, 0);
                         }
-                        return $"OK:已选中第 {rowIndex} 行";
+                        return $"OK:宸查€変腑绗?{rowIndex} 琛?;
                     }
                     current++;
                 }
                 child = walker.GetNextSibling(child);
             }
-            return $"ERR:行超出范围";
+            return $"ERR:琛岃秴鍑鸿寖鍥?;
         }
 
         static string DoPopupInfo(IntPtr window, string[] parts)
@@ -476,8 +490,7 @@ namespace GnwayAgent
         }
 
         // =====================================================
-        //  Win32 物理世界透视树
-        // =====================================================
+        //  Win32 鐗╃悊涓栫晫閫忚鏍?        // =====================================================
 
         static void DoListControlsStream(IntPtr window, string[] parts, TextWriter writer)
         {
@@ -486,7 +499,53 @@ namespace GnwayAgent
             try { WalkWin32Tree(window, writer, 1, counters); }
             catch (Exception ex) { writer.WriteLine($"ERR:{ex.Message}"); }
         }
+        static void EnumerateUIAVirtualButtons(IntPtr parentHwnd, string parentMagicId, TextWriter writer, int depth)
+        {
+            try
+            {
+                var root = AutomationElement.FromHandle(parentHwnd);
+                var children = root.FindAll(TreeScope.Children, Condition.TrueCondition);
+                int index = 1;
+                foreach (AutomationElement el in children)
+                {
+                    if (el.Current.ControlType != ControlType.Button && el.Current.ControlType != ControlType.MenuItem) continue;
+                    
+                    string text = el.Current.Name ?? "";
+                    string magicId = $"<UIA_{parentMagicId}_BTN{index}>";
+                    bool enabled = el.Current.IsEnabled;
+                    var rect = el.Current.BoundingRectangle;
+                    int w = (int)rect.Width;
+                    string displayRect = w > 0 ? $"[{(int)rect.Left},{(int)rect.Top}宽:{w}]" : "";
+                    
+                    writer.WriteLine($"UIA_Button|{depth}|{magicId}|{text}|{displayRect}|{(enabled ? "1" : "0")}");
+                    index++;
+                }
+            }
+            catch { }
+        }
 
+        static AutomationElement FindUiaVirtualControl(IntPtr window, string controlName)
+        {
+            var uiaMatch = System.Text.RegularExpressions.Regex.Match(controlName, @"<UIA_([A-Za-z0-9_]+?)(\d+)_BTN(\d+)>");
+            if (!uiaMatch.Success) throw new Exception("无效的虚拟按键格式");
+            
+            string parentMagic = $"<{uiaMatch.Groups[1].Value}{uiaMatch.Groups[2].Value}>";
+            int btnIndex = int.Parse(uiaMatch.Groups[3].Value);
+            
+            IntPtr parentHwnd = FindControl(window, parentMagic);
+            if (parentHwnd == IntPtr.Zero) throw new Exception($"找不到宿主工具栏: {parentMagic}");
+            
+            var root = AutomationElement.FromHandle(parentHwnd);
+            var children = root.FindAll(TreeScope.Children, Condition.TrueCondition);
+            int curIdx = 1;
+            foreach (AutomationElement el in children)
+            {
+                if (el.Current.ControlType != ControlType.Button && el.Current.ControlType != ControlType.MenuItem) continue;
+                if (curIdx == btnIndex) return el;
+                curIdx++;
+            }
+            throw new Exception($"在工具栏中未发现第 {btnIndex} 个按钮");
+        }
         static void WalkWin32Tree(IntPtr root, TextWriter writer, int depth, Dictionary<string, int> counters)
         {
             IntPtr child = GetWindow(root, GW_CHILD);
@@ -505,14 +564,9 @@ namespace GnwayAgent
                 GetWindowRect(child, out RECT rect);
                 int w = rect.Right - rect.Left;
                 
-                string display = string.IsNullOrWhiteSpace(text) ? magicId : $"{magicId} {text}";
-                display += $" [类:{cls}]";
-                if (!visible) display += " {隐}";
-                if (visible && w > 0) display += $" [矩形:{rect.Left},{rect.Top} 宽:{w}]";
+                string displayRect = visible && w > 0 ? $"[{rect.Left},{rect.Top}瀹?{w}]" : (visible ? "" : "{闅恾");
                 
-                string pad = new string('-', depth * 2) + " ";
-                
-                // 白噪音垃圾容器过滤 (仅限没有显示标题的透明/装饰类)
+                // 鐧藉櫔闊冲瀮鍦惧鍣ㄨ繃婊?(浠呴檺娌℃湁鏄剧ず鏍囬鐨勯€忔槑/瑁呴グ绫?
                 bool isNoise = string.IsNullOrWhiteSpace(text) && (
                     cls.IndexOf("Timer", StringComparison.OrdinalIgnoreCase) >= 0 ||
                     cls.IndexOf("PictureBox", StringComparison.OrdinalIgnoreCase) >= 0 ||
@@ -528,7 +582,11 @@ namespace GnwayAgent
 
                 if (!isNoise)
                 {
-                    writer.WriteLine($"{cls}|{pad}{display}|{(enabled ? "1" : "0")}");
+                    writer.WriteLine($"{cls}|{depth}|{magicId}|{text}|{displayRect}|{(enabled ? "1" : "0")}");
+                }
+                if (cls.IndexOf("toolbar", StringComparison.OrdinalIgnoreCase) >= 0 || cls.IndexOf("msvb_lib_toolbar", StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    try { EnumerateUIAVirtualButtons(child, magicId.Trim('<', '>'), writer, depth + 1); } catch { }
                 }
                 
                 WalkWin32Tree(child, writer, depth + 1, counters);
@@ -590,3 +648,4 @@ namespace GnwayAgent
         }
     }
 }
+

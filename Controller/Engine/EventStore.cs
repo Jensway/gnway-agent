@@ -91,7 +91,7 @@ namespace GnwayController.Engine
         /// <summary>解析 listcontrols 返回的控件列表</summary>
         public static List<ControlInfo> ParseControlList(string rawOk)
         {
-            // rawOk = "OK:Type|Name|Enabled\n..."
+            // rawOk = "OK:Type|Depth|MagicId|Text|Rect|Enabled\n..."
             string body = rawOk.StartsWith("OK:") ? rawOk.Substring(3) : rawOk;
             var list = new List<ControlInfo>();
             foreach (var line in body.Split('\n'))
@@ -99,12 +99,35 @@ namespace GnwayController.Engine
                 string trimmed = line.Trim();
                 if (string.IsNullOrEmpty(trimmed)) continue;
                 var p = trimmed.Split('|');
-                if (p.Length < 2) continue;
+                if (p.Length < 6)
+                {
+                    // Fallback to old format if necessary
+                    if (p.Length >= 2)
+                    {
+                        list.Add(new ControlInfo
+                        {
+                            Type    = p[0],
+                            Name    = p[1],
+                            Enabled = p.Length > 2 && p[2] == "1"
+                        });
+                    }
+                    continue;
+                }
+                
+                string magicId = p[2];
+                string text = p[3];
+                // Build a display name if we still want a combined one for backward compatibility
+                string combinedName = string.IsNullOrWhiteSpace(text) ? magicId : $"{magicId} {text}";
+
                 list.Add(new ControlInfo
                 {
                     Type    = p[0],
-                    Name    = p.Length > 1 ? p[1] : "",
-                    Enabled = p.Length > 2 && p[2] == "1"
+                    Depth   = int.TryParse(p[1], out int d) ? d : 0,
+                    MagicId = magicId,
+                    Text    = text,
+                    Rect    = p[4],
+                    Enabled = p[5] == "1",
+                    Name    = combinedName
                 });
             }
             return list;
