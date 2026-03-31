@@ -58,7 +58,6 @@ namespace GnwayController
         DataGridView   _dgvTree    = null!;
         Label          _lblTreeSt  = null!;
         RichTextBox    _rtTestOut  = null!;
-        Button         _btnSave    = null!;
 
         // 右上：事件列表
         ListView       _lvEvents   = null!;
@@ -86,11 +85,6 @@ namespace GnwayController
         List<AutoEvent>    _allEvents = new();
         List<string>       _flowSteps = new();   // 有序步骤 ID
         FlowRunner?        _runner;
-
-        // 当前测试缓存（用于保存事件）
-        ControlSnapshot?   _lastSnapshot;
-        EventAction?       _lastAction;
-        string             _lastWindowName = "";
 
         // 当前控件树数据（type/name/enabled列表）
         List<(string Type, string Name, bool Enabled)> _treeData = new();
@@ -218,7 +212,7 @@ namespace GnwayController
             _dgvTree.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "控件名称", Name = "colName", AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill, ReadOnly = true, SortMode = DataGridViewColumnSortMode.NotSortable });
             _dgvTree.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "状态", Name = "colEnabled", Width = 40, ReadOnly = true, SortMode = DataGridViewColumnSortMode.NotSortable });
             
-            var colAct = new DataGridViewComboBoxColumn { HeaderText = "操作", Name = "colAction", Width = 70, DropDownStyle = ComboBoxStyle.DropDownList, SortMode = DataGridViewColumnSortMode.NotSortable };
+            var colAct = new DataGridViewComboBoxColumn { HeaderText = "操作", Name = "colAction", Width = 70, DisplayStyle = DataGridViewComboBoxDisplayStyle.ComboBox, SortMode = DataGridViewColumnSortMode.NotSortable };
             colAct.Items.AddRange("click", "input", "select", "gridnext", "popupclick", "sleep");
             colAct.DefaultCellStyle.BackColor = Color.FromArgb(245, 245, 245);
             _dgvTree.Columns.Add(colAct);
@@ -873,7 +867,7 @@ namespace GnwayController
             _btnStart.Enabled = !running;
             _btnPause.Enabled = running;
             _btnStop.Enabled  = running;
-            _btnRefresh.Enabled  = !running;
+            _btnRefreshWins.Enabled  = !running;
             _btnEvtDel.Enabled= !running;
             if (!running) _btnPause.Text = "⏸ 暂停";
         }
