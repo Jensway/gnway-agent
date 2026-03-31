@@ -1,4 +1,4 @@
-﻿// =============================================================
+// =============================================================
 //  GnwayAgent - 鏈嶅姟绔?Agent (Native Win32 Edition)
 //  閮ㄧ讲鍒颁簯鑱旀湇鍔″櫒锛岄€氳繃鍛藉悕绠￠亾鎺ユ敹鍛戒护锛屾搷浣滃悓 Session 鍐呯殑绋嬪簭
 //  鍩轰簬 EnumChildWindows 瀹炵幇鏋侀€熸棤鎰熺煡銆佺簿鍑嗛€忚鐨?VB6 鎻愬彇
@@ -48,7 +48,7 @@ namespace GnwayAgent
                         var writer = new StreamWriter(stream, Encoding.UTF8) { AutoFlush = true };
 
                         string? cmdLine = reader.ReadLine();
-                        if (string.IsNullOrEmpty(cmdLine)) { writer.WriteLine("ERR:绌哄懡浠?); continue; }
+                        if (string.IsNullOrEmpty(cmdLine)) { writer.WriteLine("ERR:empty_command"); continue; }
 
                         Console.WriteLine($"[鏀跺埌缃戠粶鎸囦护] {cmdLine}");
                         string? result = ProcessCommand(cmdLine, writer);
@@ -125,7 +125,7 @@ namespace GnwayAgent
                         string output = sr.ReadToEnd();
                         Console.WriteLine(output);
                         File.WriteAllText("agent_dump.txt", output, Encoding.UTF8);
-                        Console.WriteLine("\n[猸?鎻愮ず] 缁撴灉宸插鍑鸿嚦 agent_dump.txt 鏂逛究澶嶅埗锛?);
+                        Console.WriteLine("\n[info] Result dumped to agent_dump.txt");
                     }
                 }
                 catch (Exception ex) { Console.WriteLine($"[鏈湴閿欒] {ex.Message}"); }
@@ -169,7 +169,7 @@ namespace GnwayAgent
                     return "OK:" + string.Join("|||", wins);
                 }
 
-                if (parts.Length < 2) return "ERR:鍙傛暟涓嶈冻锛堟牸寮? 鍔ㄤ綔|绋嬪簭鍚峾...锛?;
+                if (parts.Length < 2) return "ERR:missing_params_format_action|window_name...";
                 string appTitle = parts[1];
 
                 if (action == "windowexists") return FindWindowByTitle(appTitle) != IntPtr.Zero ? "OK:true" : "OK:false";
@@ -456,13 +456,13 @@ namespace GnwayAgent
                             Thread.Sleep(50);
                             mouse_event(MOUSEEVENTF_LEFTUP, pt.X, pt.Y, 0, 0);
                         }
-                        return $"OK:宸查€変腑绗?{rowIndex} 琛?;
+                        return $"OK:selected_row_{rowIndex}";
                     }
                     current++;
                 }
                 child = walker.GetNextSibling(child);
             }
-            return $"ERR:琛岃秴鍑鸿寖鍥?;
+            return $"ERR:row_out_of_bounds";
         }
 
         static string DoPopupInfo(IntPtr window, string[] parts)
