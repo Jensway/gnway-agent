@@ -286,11 +286,11 @@ namespace GnwayAgent
                     ((InvokePattern)el.GetCurrentPattern(InvokePattern.Pattern)).Invoke();
                     return $"OK:已原生虚拟点击 [{controlName}]";
                 } catch {
-                    var rect = el.Current.BoundingRectangle;
-                    System.Drawing.Point pt = new System.Drawing.Point((int)(rect.Left + rect.Width/2), (int)(rect.Top + rect.Height/2));
-                    System.Windows.Forms.Cursor.Position = pt; Thread.Sleep(50);
-                    mouse_event(MOUSEEVENTF_LEFTDOWN, pt.X, pt.Y, 0, 0); Thread.Sleep(50);
-                    mouse_event(MOUSEEVENTF_LEFTUP, pt.X, pt.Y, 0, 0);
+                    var uiaRect = el.Current.BoundingRectangle;
+                    System.Drawing.Point uiaPt = new System.Drawing.Point((int)(uiaRect.Left + uiaRect.Width/2), (int)(uiaRect.Top + uiaRect.Height/2));
+                    System.Windows.Forms.Cursor.Position = uiaPt; Thread.Sleep(50);
+                    mouse_event(MOUSEEVENTF_LEFTDOWN, uiaPt.X, uiaPt.Y, 0, 0); Thread.Sleep(50);
+                    mouse_event(MOUSEEVENTF_LEFTUP, uiaPt.X, uiaPt.Y, 0, 0);
                     return $"OK:已虚拟坐标点击 [{controlName}]";
                 }
             }
