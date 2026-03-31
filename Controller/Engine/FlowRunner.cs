@@ -178,6 +178,7 @@ namespace GnwayController.Engine
                 // 核心防超时优化：不再使用极度耗时的 listcontrols 获取上千个控件去比对
                 // 而是直接使用精准测试：检查目标窗口和目标控件是否已经存在
                 string checkCmd;
+                try { _client.Send("windows"); } catch { } // Force engine to grab new windows
                 if (!string.IsNullOrEmpty(evt.Action.ControlName))
                 {
                     checkCmd = $"exists|{evt.WindowName}|{evt.Action.ControlName}";

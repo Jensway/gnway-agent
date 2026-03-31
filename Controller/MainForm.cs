@@ -175,7 +175,7 @@ namespace GnwayController
             };
             panel.Controls.Add(splitLeft);
             splitLeft.BringToFront();
-            this.Load += (_, __) => splitLeft.SplitterDistance = 180;
+            this.Load += (_, __) => splitLeft.SplitterDistance = 240;
 
             // --- 上半部：主表（窗口列表） ---
             SectionHeader("在线窗口 (Master)", splitLeft.Panel1, DockStyle.Top);
