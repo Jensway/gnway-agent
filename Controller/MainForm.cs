@@ -48,10 +48,11 @@ namespace GnwayController
         static readonly Color C_POPUP   = Color.FromArgb(139, 92, 246);    // 弹窗紫 (Violet-500)
         static readonly Color C_WAIT    = Color.FromArgb(245, 158, 11);    // 等待黄
         static readonly Color C_DBG     = Color.FromArgb(148, 163, 184);   // 调试浅灰
+        ///
 
-        static readonly Color C_DBG     = Color.FromArgb(148, 163, 184);   // 调试浅灰
+        ///
 
-        static readonly Color C_DBG     = Color.FromArgb(148, 163, 184);
+        ///
 
         // ── 控件引用 ─────────────────────────────────────────
         TextBox        _tbServer   = null!;
