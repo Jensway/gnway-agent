@@ -213,7 +213,14 @@ namespace GnwayController.Engine
                 case "input":
                 {
                     string r = _client.Send($"input|{evt.WindowName}|{a.ControlName}|{a.Value}");
-                    Log($"  → 输入 [{a.ControlName}] \"{a.Value}\"：{OkOrErr(r)}", r.StartsWith("OK") ? LogLevel.Ok : LogLevel.Warn);
+                    Log($"  → 输入 [{a.Value}] 至 [{a.ControlName}]：{OkOrErr(r)}", r.StartsWith("OK") ? LogLevel.Ok : LogLevel.Warn);
+                    break;
+                }
+
+                case "sendkeys":
+                {
+                    string r = _client.Send($"sendkeys|{evt.WindowName}|{a.ControlName}|{a.Value}");
+                    Log($"  → 裸发按键 [{a.Value}] 至 [{a.ControlName}]：{OkOrErr(r)}", r.StartsWith("OK") ? LogLevel.Ok : LogLevel.Warn);
                     break;
                 }
 

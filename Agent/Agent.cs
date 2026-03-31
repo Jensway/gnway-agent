@@ -187,6 +187,7 @@ namespace GnwayAgent
                 {
                     "click"      => DoClick(window, parts),
                     "input"      => DoInput(window, parts),
+                    "sendkeys"   => DoSendKeys(window, parts),
                     "gettext"    => DoGetText(window, parts),
                     "select"     => DoSelect(window, parts),
                     "exists"     => DoExists(window, parts),
@@ -294,14 +295,14 @@ namespace GnwayAgent
                     RECT btnRect = GetToolbarButtonRect(parentHwnd, idx);
                     if (btnRect.Right > btnRect.Left) // 有效的包围盒
                     {
-                        System.Drawing.Point pt = new System.Drawing.Point(
+                        System.Drawing.Point tbPt = new System.Drawing.Point(
                             btnRect.Left + (btnRect.Right - btnRect.Left) / 2,
                             btnRect.Top + (btnRect.Bottom - btnRect.Top) / 2
                         );
-                        ClientToScreen(parentHwnd, ref pt);
-                        System.Windows.Forms.Cursor.Position = pt; Thread.Sleep(50);
-                        mouse_event(MOUSEEVENTF_LEFTDOWN, pt.X, pt.Y, 0, 0); Thread.Sleep(50);
-                        mouse_event(MOUSEEVENTF_LEFTUP, pt.X, pt.Y, 0, 0);
+                        ClientToScreen(parentHwnd, ref tbPt);
+                        System.Windows.Forms.Cursor.Position = tbPt; Thread.Sleep(50);
+                        mouse_event(MOUSEEVENTF_LEFTDOWN, tbPt.X, tbPt.Y, 0, 0); Thread.Sleep(50);
+                        mouse_event(MOUSEEVENTF_LEFTUP, tbPt.X, tbPt.Y, 0, 0);
                         return $"OK:已物理点击工具栏按钮 [{controlName}]";
                     }
                     else
@@ -424,6 +425,20 @@ namespace GnwayAgent
             System.Windows.Forms.SendKeys.SendWait(text);
             
             return $"OK:InputText [{text}] -> [{controlName}]";
+        }
+
+        static string DoSendKeys(IntPtr window, string[] parts)
+        {
+            string controlName = parts[2];
+            string keys = parts.Length > 3 ? parts[3] : "";
+            IntPtr ctrl = FindControl(window, controlName);
+            SetFocus(ctrl);
+            Thread.Sleep(100);
+            if (!string.IsNullOrEmpty(keys))
+            {
+                System.Windows.Forms.SendKeys.SendWait(keys);
+            }
+            return $"OK:SentKeys [{keys}] -> [{controlName}]";
         }
 
         static string DoGetText(IntPtr window, string[] parts)

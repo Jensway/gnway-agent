@@ -601,7 +601,7 @@ namespace GnwayController
             };
             
             string cmd = act switch {
-                "input" or "select" => $"{act}|{win}|{name}|{val}",
+                "input" or "select" or "sendkeys" => $"{act}|{win}|{name}|{val}",
                 "click" or "popupclick" => string.IsNullOrWhiteSpace(val) ? $"click|{win}|{name}" : $"click|{win}|{name}|{val}",
                 "gridnext"          => $"gridrows|{win}|{name}", // 测试时只需查行即可检验可读性
                 _                   => $"{act}|{win}|{name}"
@@ -661,7 +661,7 @@ namespace GnwayController
             
             var lblA = new Label { Text = "动作类型:", Location = new Point(12, 72), AutoSize = true };
             var cbA  = new ComboBox { Location = new Point(80, 70), Width = 260, DropDownStyle = ComboBoxStyle.DropDownList };
-            cbA.Items.AddRange(new[] { "click", "input", "select", "gridnext", "popupclick", "sleep" });
+            cbA.Items.AddRange(new object[] { "click", "popupclick", "input", "sendkeys", "gettext", "select", "gridnext", "sleep" });
             cbA.SelectedIndex = 0;
             
             var lblV = new Label { Text = "输入值:", Location = new Point(12, 102), AutoSize = true };
