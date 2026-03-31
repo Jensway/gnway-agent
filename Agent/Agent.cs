@@ -276,6 +276,39 @@ namespace GnwayAgent
 
             throw new Exception($"Control not found: [{controlName}]");
         }
+        static void ShowClickHighlight(System.Drawing.Rectangle rect)
+        {
+            if (rect.Width <= 0 || rect.Height <= 0) return;
+            var t = new Thread(() => {
+                try {
+                    var f = new System.Windows.Forms.Form {
+                        FormBorderStyle = System.Windows.Forms.FormBorderStyle.None,
+                        BackColor = System.Drawing.Color.Red,
+                        TransparencyKey = System.Drawing.Color.Blue,
+                        TopMost = true,
+                        ShowInTaskbar = false,
+                        StartPosition = System.Windows.Forms.FormStartPosition.Manual,
+                        Bounds = rect
+                    };
+                    var panel = new System.Windows.Forms.Panel {
+                        BackColor = System.Drawing.Color.Blue,
+                        Location = new System.Drawing.Point(3, 3),
+                        Size = new System.Drawing.Size(Math.Max(1, rect.Width - 6), Math.Max(1, rect.Height - 6))
+                    };
+                    f.Controls.Add(panel);
+                    
+                    var tmr = new System.Windows.Forms.Timer { Interval = 1000 };
+                    tmr.Tick += (s, e) => { tmr.Stop(); f.Close(); };
+                    tmr.Start();
+                    
+                    System.Windows.Forms.Application.Run(f);
+                } catch { }
+            });
+            t.SetApartmentState(ApartmentState.STA);
+            t.IsBackground = true;
+            t.Start();
+        }
+
         static string DoClick(IntPtr window, string[] parts)
         {
             string controlName = parts[2];
@@ -300,6 +333,13 @@ namespace GnwayAgent
                             btnRect.Top + (btnRect.Bottom - btnRect.Top) / 2
                         );
                         ClientToScreen(parentHwnd, ref tbPt);
+
+                        System.Drawing.Point lt = new System.Drawing.Point(btnRect.Left, btnRect.Top);
+                        System.Drawing.Point rb = new System.Drawing.Point(btnRect.Right, btnRect.Bottom);
+                        ClientToScreen(parentHwnd, ref lt);
+                        ClientToScreen(parentHwnd, ref rb);
+                        ShowClickHighlight(new System.Drawing.Rectangle(lt.X, lt.Y, rb.X - lt.X, rb.Y - lt.Y));
+
                         System.Windows.Forms.Cursor.Position = tbPt; Thread.Sleep(50);
                         mouse_event(MOUSEEVENTF_LEFTDOWN, tbPt.X, tbPt.Y, 0, 0); Thread.Sleep(50);
                         mouse_event(MOUSEEVENTF_LEFTUP, tbPt.X, tbPt.Y, 0, 0);
@@ -359,6 +399,8 @@ namespace GnwayAgent
                         return $"OK:已原生虚拟点击 [{controlName}]";
                     } catch {
                         var uiaRect = el.Current.BoundingRectangle;
+                        ShowClickHighlight(new System.Drawing.Rectangle((int)uiaRect.Left, (int)uiaRect.Top, (int)uiaRect.Width, (int)uiaRect.Height));
+
                         System.Drawing.Point uiaPt = new System.Drawing.Point((int)(uiaRect.Left + uiaRect.Width/2), (int)(uiaRect.Top + uiaRect.Height/2));
                         System.Windows.Forms.Cursor.Position = uiaPt; Thread.Sleep(50);
                         mouse_event(MOUSEEVENTF_LEFTDOWN, uiaPt.X, uiaPt.Y, 0, 0); Thread.Sleep(50);
@@ -397,6 +439,11 @@ namespace GnwayAgent
             }
 
             System.Windows.Forms.Cursor.Position = pt;
+
+            int w = rect.Right - rect.Left;
+            int h = rect.Bottom - rect.Top;
+            ShowClickHighlight(new System.Drawing.Rectangle(rect.Left, rect.Top, w, h));
+
             Thread.Sleep(50);
             mouse_event(MOUSEEVENTF_LEFTDOWN, pt.X, pt.Y, 0, 0);
             Thread.Sleep(50);
@@ -558,6 +605,8 @@ namespace GnwayAgent
                         {
                             child.SetFocus();
                             var rect = child.Current.BoundingRectangle;
+                            ShowClickHighlight(new System.Drawing.Rectangle((int)rect.Left, (int)rect.Top, (int)rect.Width, (int)rect.Height));
+
                             var pt = new System.Drawing.Point((int)(rect.Left + 5), (int)(rect.Top + rect.Height / 2));
                             System.Windows.Forms.Cursor.Position = pt;
                             Thread.Sleep(60);
