@@ -1,4 +1,4 @@
-﻿// =============================================================
+// =============================================================
 //  GnwayAgent - 鏈嶅姟绔?Agent (Native Win32 Edition)
 //  閮ㄧ讲鍒颁簯鑱旀湇鍔″櫒锛岄€氳繃鍛藉悕绠￠亾鎺ユ敹鍛戒护锛屾搷浣滃悓 Session 鍐呯殑绋嬪簭
 //  鍩轰簬 EnumChildWindows 瀹炵幇鏋侀€熸棤鎰熺煡銆佺簿鍑嗛€忚鐨?VB6 鎻愬彇
@@ -584,7 +584,10 @@ namespace GnwayAgent
                 {
                     writer.WriteLine($"{cls}|{depth}|{magicId}|{text}|{displayRect}|{(enabled ? "1" : "0")}");
                 }
-                if (cls.IndexOf("toolbar", StringComparison.OrdinalIgnoreCase) >= 0 || cls.IndexOf("msvb_lib_toolbar", StringComparison.OrdinalIgnoreCase) >= 0)
+                if (cls.IndexOf("toolbar", StringComparison.OrdinalIgnoreCase) >= 0 || 
+                    cls.IndexOf("msvb_lib_toolbar", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                    cls.IndexOf("activebar", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                    cls.IndexOf("dockwnd", StringComparison.OrdinalIgnoreCase) >= 0)
                 {
                     try { EnumerateUIAVirtualButtons(child, magicId.Trim('<', '>'), writer, depth + 1); } catch { }
                 }

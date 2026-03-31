@@ -554,7 +554,7 @@ namespace GnwayController
                 
                 row.Cells["colType"].Value    = c.Type;
                 row.Cells["colMagicId"].Value = c.MagicId;
-                row.Cells["colText"].Value    = indent + c.Text;
+                row.Cells["colText"].Value    = string.IsNullOrWhiteSpace(c.Text) ? $"{indent}<无文字>" : indent + c.Text;
                 row.Cells["colRect"].Value    = c.Rect;
                 row.Cells["colEnabled"].Value = c.Enabled ? "✓" : "✗";
                 row.Cells["colAction"].Value  = defAction;
@@ -562,6 +562,7 @@ namespace GnwayController
                 if (!c.Enabled) row.DefaultCellStyle.ForeColor = C_SUB;
             }
 
+            _dgvTree.AutoResizeColumns(DataGridViewAutoSizeColumnsMode.DisplayedCells);
             _lblTreeSt.Text = $"共 {controls.Count} 个控件   窗口：{win}";
         }
 
