@@ -1,4 +1,4 @@
-// =============================================================
+﻿// =============================================================
 //  GnwayAgent - 鏈嶅姟绔?Agent (Native Win32 Edition)
 //  閮ㄧ讲鍒颁簯鑱旀湇鍔″櫒锛岄€氳繃鍛藉悕绠￠亾鎺ユ敹鍛戒护锛屾搷浣滃悓 Session 鍐呯殑绋嬪簭
 //  鍩轰簬 EnumChildWindows 瀹炵幇鏋侀€熸棤鎰熺煡銆佺簿鍑嗛€忚鐨?VB6 鎻愬彇
@@ -147,7 +147,7 @@ namespace GnwayAgent
 
         static void PrintMenu()
         {
-            Console.WriteLine("\n==== [Agent 本地懒人调试菜单] ====");
+            Console.WriteLine("\n==== [Agent 本地调试菜单] ====");
             var list = GetValidWindows();
             for (int i = 0; i < list.Count; i++) Console.WriteLine($" [{i + 1}] {list[i]}");
             Console.WriteLine("==================================");
@@ -504,24 +504,44 @@ namespace GnwayAgent
             try
             {
                 var root = AutomationElement.FromHandle(parentHwnd);
-                var children = root.FindAll(TreeScope.Children, Condition.TrueCondition);
+                Console.WriteLine($"  [UIA扫描] 正在扫描 {parentMagicId} 的虚拟子控件...");
+                
+                // 先尝试 Descendants 深度搜索，再回退到 Children
+                var allElements = root.FindAll(TreeScope.Descendants, Condition.TrueCondition);
+                if (allElements.Count == 0)
+                    allElements = root.FindAll(TreeScope.Children, Condition.TrueCondition);
+                
+                Console.WriteLine($"  [UIA扫描] 发现 {allElements.Count} 个UIA元素");
                 int index = 1;
-                foreach (AutomationElement el in children)
+                foreach (AutomationElement el in allElements)
                 {
-                    if (el.Current.ControlType != ControlType.Button && el.Current.ControlType != ControlType.MenuItem) continue;
+                    var ct = el.Current.ControlType;
+                    // 接受所有可交互的控件类型
+                    bool isInteractive = (ct == ControlType.Button || ct == ControlType.MenuItem ||
+                                          ct == ControlType.SplitButton || ct == ControlType.Custom ||
+                                          ct == ControlType.ToolBar || ct == ControlType.Tab ||
+                                          ct == ControlType.TabItem || ct == ControlType.Hyperlink ||
+                                          ct == ControlType.Image);
+                    if (!isInteractive) continue;
+                    // 跳过工具栏容器本身
+                    if (ct == ControlType.ToolBar) continue;
                     
                     string text = el.Current.Name ?? "";
                     string magicId = $"<UIA_{parentMagicId}_BTN{index}>";
                     bool enabled = el.Current.IsEnabled;
                     var rect = el.Current.BoundingRectangle;
                     int w = (int)rect.Width;
-                    string displayRect = w > 0 ? $"[{(int)rect.Left},{(int)rect.Top}宽:{w}]" : "";
+                    string displayRect = w > 0 ? $"[{(int)rect.Left},{(int)rect.Top} Width:{w}]" : "";
+                    string typeName = ct == ControlType.Button ? "UIA_Button" :
+                                     ct == ControlType.MenuItem ? "UIA_MenuItem" : $"UIA_{ct.ProgrammaticName.Replace("ControlType.", "")}";
                     
-                    writer.WriteLine($"UIA_Button|{depth}|{magicId}|{text}|{displayRect}|{(enabled ? "1" : "0")}");
+                    writer.WriteLine($"{typeName}|{depth}|{magicId}|{text}|{displayRect}|{(enabled ? "1" : "0")}");
+                    Console.WriteLine($"    [{index}] {typeName}: {text} {displayRect}");
                     index++;
                 }
+                if (index == 1) Console.WriteLine($"  [UIA扫描] 未发现可交互的虚拟按钮");
             }
-            catch { }
+            catch (Exception ex) { Console.WriteLine($"  [UIA扫描异常] {ex.Message}"); }
         }
 
         static AutomationElement FindUiaVirtualControl(IntPtr window, string controlName)
@@ -536,11 +556,19 @@ namespace GnwayAgent
             if (parentHwnd == IntPtr.Zero) throw new Exception($"找不到宿主工具栏: {parentMagic}");
             
             var root = AutomationElement.FromHandle(parentHwnd);
-            var children = root.FindAll(TreeScope.Children, Condition.TrueCondition);
+            var allElements = root.FindAll(TreeScope.Descendants, Condition.TrueCondition);
+            if (allElements.Count == 0)
+                allElements = root.FindAll(TreeScope.Children, Condition.TrueCondition);
             int curIdx = 1;
-            foreach (AutomationElement el in children)
+            foreach (AutomationElement el in allElements)
             {
-                if (el.Current.ControlType != ControlType.Button && el.Current.ControlType != ControlType.MenuItem) continue;
+                var ct = el.Current.ControlType;
+                bool isInteractive = (ct == ControlType.Button || ct == ControlType.MenuItem ||
+                                      ct == ControlType.SplitButton || ct == ControlType.Custom ||
+                                      ct == ControlType.Tab || ct == ControlType.TabItem ||
+                                      ct == ControlType.Hyperlink || ct == ControlType.Image);
+                if (!isInteractive) continue;
+                if (ct == ControlType.ToolBar) continue;
                 if (curIdx == btnIndex) return el;
                 curIdx++;
             }
