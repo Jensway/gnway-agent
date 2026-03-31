@@ -1,4 +1,4 @@
-﻿// =============================================================
+// =============================================================
 //  GnwayAgent - 鏈嶅姟绔?Agent (Native Win32 Edition)
 //  閮ㄧ讲鍒颁簯鑱旀湇鍔″櫒锛岄€氳繃鍛藉悕绠￠亾鎺ユ敹鍛戒护锛屾搷浣滃悓 Session 鍐呯殑绋嬪簭
 //  鍩轰簬 EnumChildWindows 瀹炵幇鏋侀€熸棤鎰熺煡銆佺簿鍑嗛€忚鐨?VB6 鎻愬彇
@@ -355,9 +355,29 @@ namespace GnwayAgent
             
             // 鍏滃簳妯℃嫙鍧愭爣鐐瑰嚮
             GetWindowRect(ctrl, out RECT rect);
-            System.Drawing.Point pt = new System.Drawing.Point(
-                rect.Left + (rect.Right - rect.Left) / 2, 
-                rect.Top + (rect.Bottom - rect.Top) / 2);
+            System.Drawing.Point pt;
+
+            if (parts.Length > 3 && !string.IsNullOrWhiteSpace(parts[3]) && parts[3].Contains(","))
+            {
+                var coords = parts[3].Split(',');
+                if (coords.Length == 2 && int.TryParse(coords[0], out int x) && int.TryParse(coords[1], out int y))
+                {
+                    pt = new System.Drawing.Point(rect.Left + x, rect.Top + y);
+                }
+                else
+                {
+                    pt = new System.Drawing.Point(
+                        rect.Left + (rect.Right - rect.Left) / 2, 
+                        rect.Top + (rect.Bottom - rect.Top) / 2);
+                }
+            }
+            else
+            {
+                pt = new System.Drawing.Point(
+                    rect.Left + (rect.Right - rect.Left) / 2, 
+                    rect.Top + (rect.Bottom - rect.Top) / 2);
+            }
+
             System.Windows.Forms.Cursor.Position = pt;
             Thread.Sleep(50);
             mouse_event(MOUSEEVENTF_LEFTDOWN, pt.X, pt.Y, 0, 0);
@@ -367,7 +387,8 @@ namespace GnwayAgent
             // 鍙戦€?BM_CLICK
             SendMessage(ctrl, BM_CLICK, IntPtr.Zero, IntPtr.Zero);
             
-            return $"OK:Clicked [{controlName}]";
+            string coordMsg = parts.Length > 3 && !string.IsNullOrWhiteSpace(parts[3]) ? $"({parts[3]})" : "";
+            return $"OK:Clicked [{controlName}]{coordMsg}";
         }
 
         static string DoInput(IntPtr window, string[] parts)

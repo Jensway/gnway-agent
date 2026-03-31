@@ -202,7 +202,10 @@ namespace GnwayController.Engine
             {
                 case "click":
                 {
-                    string r = _client.Send($"click|{evt.WindowName}|{a.ControlName}");
+                    string cmd = string.IsNullOrWhiteSpace(a.Value) 
+                        ? $"click|{evt.WindowName}|{a.ControlName}"
+                        : $"click|{evt.WindowName}|{a.ControlName}|{a.Value}";
+                    string r = _client.Send(cmd);
                     Log($"  → 点击 [{a.ControlName}]：{OkOrErr(r)}", r.StartsWith("OK") ? LogLevel.Ok : LogLevel.Warn);
                     break;
                 }
@@ -235,7 +238,10 @@ namespace GnwayController.Engine
 
                 case "popupclick":
                 {
-                    string r = _client.Send($"click|{evt.WindowName}|{a.ControlName}");
+                    string cmd = string.IsNullOrWhiteSpace(a.Value) 
+                        ? $"click|{evt.WindowName}|{a.ControlName}"
+                        : $"click|{evt.WindowName}|{a.ControlName}|{a.Value}";
+                    string r = _client.Send(cmd);
                     Log($"  → 弹窗 [{evt.WindowName}] 点击 [{a.ControlName}]：{OkOrErr(r)}",
                         r.StartsWith("OK") ? LogLevel.Popup : LogLevel.Warn);
                     break;

@@ -1,4 +1,4 @@
-﻿// ============================================================
+// ============================================================
 //  MainForm.cs — GnwayAgent 可视化录制执行平台
 //
 //  布局（单窗口）：
@@ -330,7 +330,7 @@ namespace GnwayController
                 }
                 string act = cbAct.Text;
                 string val = tbVal.Text;
-                string cmd = (act == "input" || act == "select") ? $"{act}|{win}|{ctl}|{val}" : $"{act}|{win}|{ctl}";
+                string cmd = (act == "input" || act == "select" || act == "click") ? (string.IsNullOrWhiteSpace(val) ? $"{act}|{win}|{ctl}" : $"{act}|{win}|{ctl}|{val}") : $"{act}|{win}|{ctl}";
                 
                 var client = new AgentClient(_tbServer.Text.Trim(), timeoutMs: 15000);
                 AppendTest($"[独立闪击] 正在发送: {cmd}", C_ACCENT);
@@ -602,6 +602,7 @@ namespace GnwayController
             
             string cmd = act switch {
                 "input" or "select" => $"{act}|{win}|{name}|{val}",
+                "click" or "popupclick" => string.IsNullOrWhiteSpace(val) ? $"click|{win}|{name}" : $"click|{win}|{name}|{val}",
                 "gridnext"          => $"gridrows|{win}|{name}", // 测试时只需查行即可检验可读性
                 _                   => $"{act}|{win}|{name}"
             };
