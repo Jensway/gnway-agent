@@ -49,12 +49,12 @@ namespace GnwayController
 
         // ── 控件引用 ─────────────────────────────────────────
         TextBox        _tbServer   = null!;
-        ComboBox       _tbWindow   = null!;
         Button         _btnTest    = null!;
-        Button         _btnRefresh = null!;
+        Button         _btnRefreshWins = null!;
         Label          _lblConn    = null!;
 
-        // 左区
+        // 左区：主细表明细
+        DataGridView   _dgvWindows = null!;
         DataGridView   _dgvTree    = null!;
         Label          _lblTreeSt  = null!;
         RichTextBox    _rtTestOut  = null!;
@@ -149,19 +149,9 @@ namespace GnwayController
             };
             toolbar.Controls.Add(_lblConn); x += 145;
 
-            toolbar.Controls.Add(Lbl("目标窗口（可用下拉或模糊匹配）", toolbar, new Point(x, 8)));
-            _tbWindow = new ComboBox {
-                Text = "", Width = 210, Location = new Point(x, 26),
-                Font = F_BODY, DropDownStyle = ComboBoxStyle.DropDown
-            };
-            toolbar.Controls.Add(_tbWindow); x += 218;
-
-            var btnGetWins = Btn("▼ 获取", toolbar, new Point(x, 24), 60, C_CARD, C_TEXT);
-            btnGetWins.Click += OnGetWindows;
-            toolbar.Controls.Add(btnGetWins); x += 68;
-
-            _btnRefresh = Btn("🔄 刷新控件树", toolbar, new Point(x, 24), 110, C_BG, C_TEXT);
-            _btnRefresh.Click += OnRefreshTree;
+            _btnRefreshWins = Btn("🔄 获取全部窗口", toolbar, new Point(x, 24), 110, C_BG, C_TEXT);
+            _btnRefreshWins.Click += OnGetWindows;
+            toolbar.Controls.Add(_btnRefreshWins); x += 120;
 
             // ── 主体 SplitContainer ──────────────────────────
             var split = new SplitContainer {
@@ -180,32 +170,42 @@ namespace GnwayController
         }
 
         // =====================================================
-        //  左区：控件树
+        //  左区：Master-Detail 布局
         // =====================================================
         private void BuildLeftPanel(SplitterPanel panel)
         {
-            // 标题
-            var hdr = SectionHeader("控件树", panel, DockStyle.Top);
+            var splitLeft = new SplitContainer {
+                Dock = DockStyle.Fill, Orientation = Orientation.Horizontal,
+                SplitterWidth = 5, Panel1MinSize = 100, BackColor = C_BG
+            };
+            panel.Controls.Add(splitLeft);
+            splitLeft.BringToFront();
+            this.Load += (_, __) => splitLeft.SplitterDistance = 180;
 
-            // DataGridView
-            _dgvTree = new DataGridView
-            {
+            // --- 上半部：主表（窗口列表） ---
+            SectionHeader("在线窗口 (Master)", splitLeft.Panel1, DockStyle.Top);
+            _dgvWindows = new DataGridView {
+                Dock = DockStyle.Fill, RowHeadersVisible = false, AllowUserToAddRows = false,
+                AllowUserToDeleteRows = false, AllowUserToResizeRows = false, MultiSelect = false,
+                SelectionMode = DataGridViewSelectionMode.FullRowSelect, BackgroundColor = C_CARD,
+                BorderStyle = BorderStyle.None, ReadOnly = true, Font = F_SMALL, RowTemplate = { Height = 28 }
+            };
+            _dgvWindows.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "窗口名称", Name = "colWinName", AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill });
+            _dgvWindows.SelectionChanged += OnWindowSelectionChanged;
+            splitLeft.Panel1.Controls.Add(_dgvWindows);
+            _dgvWindows.BringToFront();
+
+            // --- 下半部：明细表（控件与动作组合） ---
+            SectionHeader("窗口控件与内联动作 (Detail)", splitLeft.Panel2, DockStyle.Top);
+            
+            _dgvTree = new DataGridView {
                 Dock = DockStyle.Fill,
-                RowHeadersVisible = false,
-                AllowUserToAddRows = false,
-                AllowUserToDeleteRows = false,
-                AllowUserToResizeRows = false,
-                MultiSelect = false,
-                SelectionMode = DataGridViewSelectionMode.FullRowSelect,
-                AutoSizeRowsMode = DataGridViewAutoSizeRowsMode.None,
-                RowTemplate = { Height = 30 },
-                BackgroundColor = C_CARD,
-                BorderStyle = BorderStyle.None,
-                GridColor = C_BORDER,
-                Font = F_SMALL,
-                ReadOnly = true,
+                RowHeadersVisible = false, AllowUserToAddRows = false, AllowUserToDeleteRows = false,
+                AllowUserToResizeRows = false, MultiSelect = false, SelectionMode = DataGridViewSelectionMode.CellSelect,
+                AutoSizeRowsMode = DataGridViewAutoSizeRowsMode.None, RowTemplate = { Height = 30 },
+                BackgroundColor = C_CARD, BorderStyle = BorderStyle.None, GridColor = C_BORDER, Font = F_SMALL,
                 ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.DisableResizing,
-                ColumnHeadersHeight = 28,
+                ColumnHeadersHeight = 28, EditMode = DataGridViewEditMode.EditOnEnter
             };
             _dgvTree.ColumnHeadersDefaultCellStyle.BackColor  = Color.FromArgb(240, 244, 252);
             _dgvTree.ColumnHeadersDefaultCellStyle.Font       = F_SMALL;
@@ -214,65 +214,50 @@ namespace GnwayController
             _dgvTree.DefaultCellStyle.SelectionBackColor = Color.FromArgb(219, 234, 254);
             _dgvTree.DefaultCellStyle.SelectionForeColor = C_TEXT;
 
-            // 列定义
-            _dgvTree.Columns.Add(new DataGridViewTextBoxColumn {
-                HeaderText = "类型", Name = "colType",
-                Width = 90, SortMode = DataGridViewColumnSortMode.NotSortable
-            });
-            _dgvTree.Columns.Add(new DataGridViewTextBoxColumn {
-                HeaderText = "控件名称", Name = "colName",
-                AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill,
-                SortMode = DataGridViewColumnSortMode.NotSortable
-            });
-            _dgvTree.Columns.Add(new DataGridViewTextBoxColumn {
-                HeaderText = "状态", Name = "colEnabled",
-                Width = 42, SortMode = DataGridViewColumnSortMode.NotSortable
-            });
-            var btnCol = new DataGridViewButtonColumn {
-                HeaderText = "操作", Name = "colAction",
-                Text = "...", UseColumnTextForButtonValue = false,
-                Width = 68, SortMode = DataGridViewColumnSortMode.NotSortable
-            };
-            btnCol.DefaultCellStyle.Font = F_SMALL;
-            _dgvTree.Columns.Add(btnCol);
+            _dgvTree.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "类型", Name = "colType", Width = 90, ReadOnly = true, SortMode = DataGridViewColumnSortMode.NotSortable });
+            _dgvTree.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "控件名称", Name = "colName", AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill, ReadOnly = true, SortMode = DataGridViewColumnSortMode.NotSortable });
+            _dgvTree.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "状态", Name = "colEnabled", Width = 40, ReadOnly = true, SortMode = DataGridViewColumnSortMode.NotSortable });
+            
+            var colAct = new DataGridViewComboBoxColumn { HeaderText = "操作", Name = "colAction", Width = 70, DropDownStyle = ComboBoxStyle.DropDownList, SortMode = DataGridViewColumnSortMode.NotSortable };
+            colAct.Items.AddRange("click", "input", "select", "gridnext", "popupclick", "sleep");
+            colAct.DefaultCellStyle.BackColor = Color.FromArgb(245, 245, 245);
+            _dgvTree.Columns.Add(colAct);
 
-            _dgvTree.CellContentClick  += OnTreeActionClick;
-            _dgvTree.CellFormatting    += OnTreeCellFormat;
-            panel.Controls.Add(_dgvTree);
+            var colVal = new DataGridViewTextBoxColumn { HeaderText = "测试值", Name = "colValue", Width = 90, SortMode = DataGridViewColumnSortMode.NotSortable };
+            colVal.DefaultCellStyle.BackColor = Color.LightYellow;
+            _dgvTree.Columns.Add(colVal);
 
-            // 底部：状态 + 测试输出
+            _dgvTree.Columns.Add(new DataGridViewButtonColumn { HeaderText = "测试", Name = "colTest", Text = "▶测试", UseColumnTextForButtonValue = true, Width = 55, SortMode = DataGridViewColumnSortMode.NotSortable });
+            _dgvTree.Columns.Add(new DataGridViewButtonColumn { HeaderText = "保存", Name = "colSave", Text = "💾保存", UseColumnTextForButtonValue = true, Width = 55, SortMode = DataGridViewColumnSortMode.NotSortable });
+
+            _dgvTree.CellContentClick += OnTreeActionClick;
+            _dgvTree.CellFormatting   += OnTreeCellFormat;
+            splitLeft.Panel2.Controls.Add(_dgvTree);
+
+            // 底部：状态 + 测试输出 (附着在 Panel2)
             var bottom = new Panel { Dock = DockStyle.Bottom, Height = 155, BackColor = C_CARD };
-            bottom.Paint += (s, e) =>
-                e.Graphics.DrawLine(new Pen(C_BORDER), 0, 0, bottom.Width, 0);
-            panel.Controls.Add(bottom);
+            bottom.Paint += (s, e) => e.Graphics.DrawLine(new Pen(C_BORDER), 0, 0, bottom.Width, 0);
+            splitLeft.Panel2.Controls.Add(bottom);
 
             _lblTreeSt = new Label {
-                Text = "控件树空——请先输入窗口名并点刷新",
-                Location = new Point(8, 6), AutoSize = true,
-                ForeColor = C_SUB, Font = F_SMALL, BackColor = Color.Transparent
+                Text = "控件树空——请先点击上方任一在线窗口",
+                Location = new Point(8, 6), AutoSize = true, ForeColor = C_SUB, Font = F_SMALL, BackColor = Color.Transparent
             };
             bottom.Controls.Add(_lblTreeSt);
 
             _rtTestOut = new RichTextBox {
-                Location = new Point(8, 24), Size = new Size(0, 90),
-                BackColor = Color.FromArgb(20, 24, 36),
-                ForeColor = Color.FromArgb(200, 215, 240),
-                Font = F_MONO, BorderStyle = BorderStyle.None,
-                ReadOnly = true, ScrollBars = RichTextBoxScrollBars.Vertical,
-                WordWrap = true
+                Location = new Point(8, 24), Size = new Size(0, 90), BackColor = Color.FromArgb(20, 24, 36),
+                ForeColor = Color.FromArgb(200, 215, 240), Font = F_MONO, BorderStyle = BorderStyle.None,
+                ReadOnly = true, ScrollBars = RichTextBoxScrollBars.Vertical, WordWrap = true
             };
             bottom.Resize += (_, __) => _rtTestOut.Width = bottom.Width - 16;
             bottom.Controls.Add(_rtTestOut);
 
-            _btnSave = Btn("💾 保存为事件", bottom, new Point(8, 122), 130, C_OK, Color.White);
-            _btnSave.Enabled = false;
-            _btnSave.Click   += OnSaveEvent;
-
-            var btnClearTest = Btn("清空", bottom, new Point(146, 122), 52, C_BG, C_SUB);
-            btnClearTest.Click += (_, __) => { _rtTestOut.Clear(); _btnSave.Enabled = false; };
+            var btnClearTest = Btn("清空输出", bottom, new Point(8, 122), 70, C_BG, C_SUB);
+            btnClearTest.Click += (_, __) => _rtTestOut.Clear();
             bottom.Controls.Add(btnClearTest);
 
-            _dgvTree.BringToFront(); // [!!! FIX MANGLED LEFT PANEL (TREE DATA GRID) OVERLAP !!!]
+            _dgvTree.BringToFront(); // 让 Tree 占用剩余空间
         }
 
         // =====================================================
@@ -319,10 +304,10 @@ namespace GnwayController
             
             var btnSend = Btn("🚀 发射", quickBar, new Point(qx, 8), 66, Color.FromArgb(7, 140, 190), Color.White);
             btnSend.Click += async (s, e) => {
-                string win = _tbWindow.Text.Trim();
+                string win = _dgvWindows.SelectedRows.Count > 0 ? _dgvWindows.SelectedRows[0].Cells[0].Value?.ToString() ?? "" : "";
                 string ctl = tbCtrl.Text.Trim();
                 if (string.IsNullOrEmpty(win) || string.IsNullOrEmpty(ctl)) {
-                    MessageBox.Show("左上角目标窗口、及这里的控件名均不能为空！\n提示：直接填入服务端打出的如 <Edit3> 或中文按钮名。", "校验失败", MessageBoxButtons.OK, MessageBoxIcon.Warning); return;
+                    MessageBox.Show("左侧在线窗口、及这里的控件名均不能为空！\n提示：直接填入服务端打出的或选中窗口。", "校验失败", MessageBoxButtons.OK, MessageBoxIcon.Warning); return;
                 }
                 string act = cbAct.Text;
                 string val = tbVal.Text;
@@ -478,10 +463,8 @@ namespace GnwayController
                 _lblConn.ForeColor = C_OK;
                 _lblConn.Text = $"✓ 连接正常（{wins.Length} 窗口）";
 
-                _tbWindow.Items.Clear();
-                _tbWindow.Items.AddRange(wins);
-                if (wins.Length > 0 && string.IsNullOrWhiteSpace(_tbWindow.Text))
-                    _tbWindow.SelectedIndex = 0;
+                _dgvWindows.Rows.Clear();
+                foreach (var w in wins) _dgvWindows.Rows.Add(w);
             }
             else
             {
@@ -508,13 +491,8 @@ namespace GnwayController
                         ? r.Substring(3).Split(new[] { "|||" }, StringSplitOptions.RemoveEmptyEntries)
                         : Array.Empty<string>();
 
-                    _tbWindow.Items.Clear();
-                    _tbWindow.Items.AddRange(wins);
-                    if (wins.Length > 0 && string.IsNullOrWhiteSpace(_tbWindow.Text))
-                        _tbWindow.SelectedIndex = 0;
-
-                    if (_tbWindow.Items.Count > 0)
-                        _tbWindow.DroppedDown = true;
+                    _dgvWindows.Rows.Clear();
+                    foreach (var w in wins) _dgvWindows.Rows.Add(w);
                 }
                 else
                 {
@@ -529,17 +507,12 @@ namespace GnwayController
             if (btn != null) btn.Enabled = true;
         }
 
-        private async void OnRefreshTree(object? s, EventArgs e)
+        private async void OnWindowSelectionChanged(object? s, EventArgs e)
         {
-            string win = _tbWindow.Text.Trim();
-            if (string.IsNullOrEmpty(win))
-            {
-                MessageBox.Show("请先填写目标窗口名称", "提示",
-                    MessageBoxButtons.OK, MessageBoxIcon.Information);
-                return;
-            }
+            if (_dgvWindows.SelectedRows.Count == 0) return;
+            string win = _dgvWindows.SelectedRows[0].Cells[0].Value?.ToString() ?? "";
+            if (string.IsNullOrEmpty(win)) return;
 
-            _btnRefresh.Enabled = false;
             _lblTreeSt.Text = "正在读取控件树…";
             _dgvTree.Rows.Clear();
             _treeData.Clear();
@@ -547,8 +520,6 @@ namespace GnwayController
             string server = _tbServer.Text.Trim();
             var client = new AgentClient(server, timeoutMs: 30000);
             string result = await Task.Run(() => client.Send($"listcontrols|{win}|10"));
-
-            _btnRefresh.Enabled = true;
 
             if (!result.StartsWith("OK:"))
             {
@@ -560,35 +531,40 @@ namespace GnwayController
             foreach (var c in controls)
             {
                 _treeData.Add((c.Type, c.Name, c.Enabled));
-                string actionLabel = GetActionLabel(c.Type);
+                string defAction = GetActionLabel(c.Type); // mapped to "click", "input", etc.
                 var row = _dgvTree.Rows[_dgvTree.Rows.Add()];
                 row.Cells["colType"].Value    = c.Type;
                 row.Cells["colName"].Value    = c.Name;
                 row.Cells["colEnabled"].Value = c.Enabled ? "✓" : "✗";
-                row.Cells["colAction"].Value  = actionLabel;
-                row.Cells["colAction"].Style.BackColor = c.Enabled
-                    ? Color.FromArgb(219, 234, 254)
-                    : Color.FromArgb(240, 240, 240);
-                if (!c.Enabled)
-                    row.DefaultCellStyle.ForeColor = C_SUB;
+                row.Cells["colAction"].Value  = defAction;
+                row.Cells["colValue"].Value   = "";
+                if (!c.Enabled) row.DefaultCellStyle.ForeColor = C_SUB;
             }
 
             _lblTreeSt.Text = $"共 {controls.Count} 个控件   窗口：{win}";
         }
 
         // =====================================================
-        //  控件树操作按钮点击
+        //  控件树内联操作 (测试 / 保存)
         // =====================================================
         private async void OnTreeActionClick(object? s, DataGridViewCellEventArgs e)
         {
-            if (e.ColumnIndex != _dgvTree.Columns["colAction"].Index || e.RowIndex < 0)
-                return;
+            if (e.RowIndex < 0) return;
+            var col = _dgvTree.Columns[e.ColumnIndex].Name;
+            if (col != "colTest" && col != "colSave") return;
 
-            var row = _dgvTree.Rows[e.RowIndex];
-            string type    = row.Cells["colType"].Value?.ToString() ?? "";
-            string name    = row.Cells["colName"].Value?.ToString() ?? "";
-            bool   enabled = row.Cells["colEnabled"].Value?.ToString() == "✓";
-            string win     = _tbWindow.Text.Trim();
+            if (_dgvWindows.SelectedRows.Count == 0) return;
+            string win = _dgvWindows.SelectedRows[0].Cells[0].Value?.ToString() ?? "";
+            if (string.IsNullOrEmpty(win)) return;
+
+            // 为了内联编辑实时生效，需结束编辑状态
+            _dgvTree.EndEdit();
+
+            var row     = _dgvTree.Rows[e.RowIndex];
+            string name = row.Cells["colName"].Value?.ToString() ?? "";
+            string act  = row.Cells["colAction"].Value?.ToString() ?? "click";
+            string val  = row.Cells["colValue"].Value?.ToString() ?? "";
+            bool enabled= row.Cells["colEnabled"].Value?.ToString() == "✓";
 
             if (!enabled)
             {
@@ -596,62 +572,40 @@ namespace GnwayController
                 return;
             }
 
-            var client = new AgentClient(_tbServer.Text.Trim(), timeoutMs: 15000);
-            string cmd = "";
-            EventAction action;
-
-            // ── 根据控件类型决定动作 ─────────────────────────
-            if (IsGridType(type))
-            {
-                // 弹出对话框让用户配置 gridnext 参数
-                var dlg = new GridNextDialog(client, win, name);
-                if (dlg.ShowDialog(this) != DialogResult.OK) return;
-                action = dlg.Result;
-                cmd    = $"gridrows|{win}|{name}";  // 测试时先读行，选行逻辑在 dlg 里完成
-            }
-            else if (type == "Edit" || type == "Document" || type.Contains("Text"))
-            {
-                string? val = PromptInput($"输入  [{name}]", "请输入要键入的文字：", "");
-                if (val == null) return;
-                action = new EventAction { Type = "input", ControlName = name, Value = val };
-                cmd    = $"input|{win}|{name}|{val}";
-            }
-            else if (type == "ComboBox" || type == "List")
-            {
-                string? val = PromptInput($"选择  [{name}]", "请输入要选择的选项文字：", "");
-                if (val == null) return;
-                action = new EventAction { Type = "select", ControlName = name, Value = val };
-                cmd    = $"select|{win}|{name}|{val}";
-            }
-            else
-            {
-                // 默认：点击
-                action = new EventAction { Type = "click", ControlName = name };
-                cmd    = $"click|{win}|{name}";
-            }
-
-            // ── 捕获快照（执行前） ────────────────────────────
-            string snapRaw = await Task.Run(() => client.Send($"listcontrols|{win}|10"));
-            var snapshot = new ControlSnapshot
-            {
-                Controls   = EventStore.ParseControlList(snapRaw),
-                CapturedAt = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")
+            var action = new EventAction {
+                Type = act, ControlName = name, Value = val, MatchText = val
+            };
+            
+            string cmd = act switch {
+                "input" or "select" => $"{act}|{win}|{name}|{val}",
+                "gridnext"          => $"gridrows|{win}|{name}", // 测试时只需查行即可检验可读性
+                _                   => $"{act}|{win}|{name}"
             };
 
-            // ── 执行命令 ──────────────────────────────────────
-            AppendTest($">>> {cmd}", Color.FromArgb(100, 200, 255));
-            string result = await Task.Run(() => client.Send(cmd));
-            bool ok = result.StartsWith("OK");
-            AppendTest(result, ok ? Color.FromArgb(120, 230, 120) : Color.FromArgb(255, 120, 100));
+            var client = new AgentClient(_tbServer.Text.Trim(), timeoutMs: 15000);
 
-            if (ok)
+            if (col == "colTest")
             {
-                _lastWindowName = win;
-                _lastSnapshot   = snapshot;
-                _lastAction     = action;
-                _btnSave.Enabled = true;
-                AppendTest("✅ 测试成功！可点击「保存为事件」录制此步骤。",
-                           Color.FromArgb(50, 205, 100));
+                AppendTest($">>> {cmd}", Color.FromArgb(100, 200, 255));
+                try 
+                {
+                    string r = await Task.Run(() => client.Send(cmd));
+                    AppendTest(r, r.StartsWith("OK") ? Color.FromArgb(120, 230, 120) : Color.FromArgb(255, 120, 100));
+                }
+                catch (Exception ex) { AppendTest($"通信失败: {ex.Message}", C_ERR); }
+            }
+            else if (col == "colSave")
+            {
+                string? stepName = PromptInput("保存事件", @"请为该步骤取一个名称（如 ""选待处理行""）：", action.Describe());
+                if (string.IsNullOrWhiteSpace(stepName)) return;
+
+                var evt = new AutoEvent {
+                    Id = EventStore.NewId(), Name = stepName.Trim(), WindowName = win,
+                    Snapshot = new ControlSnapshot(), Action = action
+                };
+                _store.Save(evt);
+                AppendTest($"✅ 步骤「{evt.Name}」已保存至流程录制库！", Color.FromArgb(50, 205, 100));
+                ReloadEvents();
             }
         }
 
@@ -665,7 +619,8 @@ namespace GnwayController
                 FormBorderStyle = FormBorderStyle.FixedDialog, StartPosition = FormStartPosition.CenterParent
             };
             var lblW = new Label { Text = "目标窗口:", Location = new Point(12, 12), AutoSize = true };
-            var tbW  = new TextBox { Text = _tbWindow.Text.Trim(), Location = new Point(80, 10), Width = 260 };
+            string curWin = _dgvWindows.SelectedRows.Count > 0 ? _dgvWindows.SelectedRows[0].Cells[0].Value?.ToString() ?? "" : "";
+            var tbW  = new TextBox { Text = curWin, Location = new Point(80, 10), Width = 260 };
             
             var lblC = new Label { Text = "控件名称:", Location = new Point(12, 42), AutoSize = true };
             var tbC  = new TextBox { Text = "生成按钮", Location = new Point(80, 40), Width = 260 };
@@ -707,28 +662,6 @@ namespace GnwayController
                 ReloadEvents();
                 AppendLog($"💾 手动事件「{evt.Name}」已保存。", C_OK);
             }
-        }
-
-        private void OnSaveEvent(object? s, EventArgs e)
-        {
-            if (_lastSnapshot == null || _lastAction == null) return;
-
-            string? name = PromptInput("保存事件", @"请为该步骤取一个名称（如 ""选待处理行""）：",
-                                       _lastAction.Describe());
-            if (string.IsNullOrWhiteSpace(name)) return;
-
-            var evt = new AutoEvent
-            {
-                Id         = EventStore.NewId(),
-                Name       = name.Trim(),
-                WindowName = _lastWindowName,
-                Snapshot   = _lastSnapshot,
-                Action     = _lastAction
-            };
-            _store.Save(evt);
-            _btnSave.Enabled = false;
-            AppendTest($"💾 事件「{name}」已保存。", Color.FromArgb(50, 205, 100));
-            ReloadEvents();
         }
 
         // =====================================================
