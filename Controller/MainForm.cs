@@ -27,10 +27,10 @@ namespace GnwayController
     {
         // ── 设计令牌 ──────────────────────────────────────────
         static readonly Font F_BODY  = new Font("Segoe UI", 9f);
-        static readonly Font F_SMALL = new Font("Segoe UI", 9f);
-        static readonly Font F_BOLD  = new Font("Segoe UI", 9.5f, FontStyle.Bold);
+        static readonly Font F_SMALL = new Font("Segoe UI", 8.5f);
+        static readonly Font F_BOLD  = new Font("Segoe UI", 9f, FontStyle.Bold);
         static readonly Font F_LOG   = new Font("Consolas",  9f);
-        static readonly Font F_TITLE = new Font("Segoe UI", 11f, FontStyle.Bold);
+        static readonly Font F_TITLE = new Font("Segoe UI", 10f, FontStyle.Bold);
         static readonly Font F_MONO  = new Font("Consolas",  8.5f);
 
         static readonly Color C_BG      = Color.FromArgb(242, 245, 250);
@@ -198,14 +198,15 @@ namespace GnwayController
                 RowHeadersVisible = false, AllowUserToAddRows = false, AllowUserToDeleteRows = false,
                 AllowUserToResizeRows = false, AllowUserToResizeColumns = true,
                 MultiSelect = false, SelectionMode = DataGridViewSelectionMode.CellSelect,
-                AutoSizeRowsMode = DataGridViewAutoSizeRowsMode.None, RowTemplate = { Height = 30 },
+                AutoSizeRowsMode = DataGridViewAutoSizeRowsMode.None, RowTemplate = { Height = 25 },
                 BackgroundColor = C_CARD, BorderStyle = BorderStyle.FixedSingle, GridColor = Color.FromArgb(240, 240, 240), Font = F_SMALL,
                 ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.DisableResizing,
-                ColumnHeadersHeight = 28, EditMode = DataGridViewEditMode.EditOnEnter,
+                ColumnHeadersHeight = 25, EditMode = DataGridViewEditMode.EditOnEnter,
                 AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None,
                 ScrollBars = ScrollBars.Both,
                 ClipboardCopyMode = DataGridViewClipboardCopyMode.EnableWithoutHeaderText
             };
+            _dgvTree.AlternatingRowsDefaultCellStyle.BackColor = Color.FromArgb(246, 248, 252);
             _dgvTree.ColumnHeadersDefaultCellStyle.BackColor  = Color.FromArgb(240, 244, 252);
             _dgvTree.ColumnHeadersDefaultCellStyle.Font       = F_SMALL;
             _dgvTree.ColumnHeadersDefaultCellStyle.ForeColor  = C_TEXT;
@@ -214,7 +215,7 @@ namespace GnwayController
             _dgvTree.DefaultCellStyle.SelectionForeColor = C_TEXT;
 
             _dgvTree.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "类型", Name = "colType", Width = 140, MinimumWidth = 40, Resizable = DataGridViewTriState.True, AutoSizeMode = DataGridViewAutoSizeColumnMode.None, ReadOnly = true, SortMode = DataGridViewColumnSortMode.NotSortable });
-            _dgvTree.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "标识码", Name = "colMagicId", Width = 200, MinimumWidth = 60, Resizable = DataGridViewTriState.True, AutoSizeMode = DataGridViewAutoSizeColumnMode.None, ReadOnly = true, SortMode = DataGridViewColumnSortMode.NotSortable });
+            _dgvTree.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "标识码", Name = "colMagicId", Width = 200, MinimumWidth = 60, Resizable = DataGridViewTriState.True, AutoSizeMode = DataGridViewAutoSizeColumnMode.None, ReadOnly = true, SortMode = DataGridViewColumnSortMode.NotSortable, Frozen = true });
             _dgvTree.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "标题文字", Name = "colText", Width = 200, MinimumWidth = 60, Resizable = DataGridViewTriState.True, AutoSizeMode = DataGridViewAutoSizeColumnMode.None, ReadOnly = true, SortMode = DataGridViewColumnSortMode.NotSortable });
             _dgvTree.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "坐标矩形", Name = "colRect", Width = 160, MinimumWidth = 40, Resizable = DataGridViewTriState.True, AutoSizeMode = DataGridViewAutoSizeColumnMode.None, ReadOnly = true, SortMode = DataGridViewColumnSortMode.NotSortable });
             _dgvTree.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "状态", Name = "colEnabled", Width = 40, MinimumWidth = 30, Resizable = DataGridViewTriState.True, AutoSizeMode = DataGridViewAutoSizeColumnMode.None, ReadOnly = true, SortMode = DataGridViewColumnSortMode.NotSortable });
@@ -342,17 +343,17 @@ namespace GnwayController
         {
             var innerSplit = new SplitContainer {
                 Dock = DockStyle.Fill,
-                Orientation = Orientation.Vertical,
+                Orientation = Orientation.Horizontal,
                 SplitterWidth = 5,
                 BackColor = C_BG,
                 Panel1MinSize = 160
             };
             panel.Controls.Add(innerSplit);
             this.Load += (_, __) => {
-                innerSplit.SplitterDistance = (int)(innerSplit.Height * 0.60);
+                innerSplit.SplitterDistance = (int)(innerSplit.Height * 0.55);
             };
 
-            // ── 左半：流程步骤列表 ────────────────────────────
+            // ── 上半：流程步骤列表 ────────────────────────────
             SectionHeader("流程步骤", innerSplit.Panel1, DockStyle.Top);
 
             var stepBtnBar = new Panel { Dock = DockStyle.Top, Height = 32, BackColor = C_CARD };
@@ -385,7 +386,7 @@ namespace GnwayController
             innerSplit.Panel1.Controls.Add(_lvSteps);
             _lvSteps.BringToFront(); // [!!! FIX MANGLED RIGHT-BOTTOM-LEFT PANEL (FLOW STEPS) OVERLAP !!!]
 
-            // ── 右半：执行控制 + 日志 ─────────────────────────
+            // ── 下半：执行控制 + 日志 ─────────────────────────
             SectionHeader("执行控制 & 日志", innerSplit.Panel2, DockStyle.Top);
 
             var execBar = new Panel { Dock = DockStyle.Top, Height = 40, BackColor = C_CARD };

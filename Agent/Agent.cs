@@ -534,15 +534,48 @@ namespace GnwayAgent
         }
         static string DoExists(IntPtr window, string[] parts)
         {
-            if (parts[2].Contains("<UIA_") || parts[2].Contains("<TB_") || parts[2].Contains("<MSAA_")) { try { FindUiaVirtualControl(window, parts[2]); return "OK:true"; } catch { return "OK:false"; } }
-            try { FindControl(window, parts[2]); return "OK:true"; }
+            try
+            {
+                string ctrl = parts[2];
+                if (ctrl.Contains("<UIA_") || ctrl.Contains("<TB_") || ctrl.Contains("<MSAA_"))
+                {
+                    var match = System.Text.RegularExpressions.Regex.Match(ctrl, @"<(?:UIA|MSAA|TB)_([A-Za-z0-9_]+?)(\d+)_BTN(\d+)>");
+                    if (match.Success)
+                    {
+                        string parentMagic = $"<{match.Groups[1].Value}{match.Groups[2].Value}>";
+                        IntPtr parentHwnd = FindControl(window, parentMagic);
+                        if (parentHwnd != IntPtr.Zero) return "OK:true";
+                    }
+                    return "OK:false";
+                }
+                
+                FindControl(window, ctrl); 
+                return "OK:true";
+            }
             catch { return "OK:false"; }
         }
+
         static string DoIsEnabled(IntPtr window, string[] parts)
         {
-            if (parts[2].Contains("<UIA_") || parts[2].Contains("<TB_") || parts[2].Contains("<MSAA_")) { return FindUiaVirtualControl(window, parts[2]).Current.IsEnabled ? "OK:true" : "OK:false"; }
-            IntPtr ctrl = FindControl(window, parts[2]);
-            return IsWindowEnabled(ctrl) ? "OK:true" : "OK:false";
+            try
+            {
+                string ctrl = parts[2];
+                if (ctrl.Contains("<UIA_") || ctrl.Contains("<TB_") || ctrl.Contains("<MSAA_"))
+                {
+                    var match = System.Text.RegularExpressions.Regex.Match(ctrl, @"<(?:UIA|MSAA|TB)_([A-Za-z0-9_]+?)(\d+)_BTN(\d+)>");
+                    if (match.Success)
+                    {
+                        string parentMagic = $"<{match.Groups[1].Value}{match.Groups[2].Value}>";
+                        IntPtr parentHwnd = FindControl(window, parentMagic);
+                        return IsWindowEnabled(parentHwnd) ? "OK:true" : "OK:false";
+                    }
+                    return "OK:false";
+                }
+
+                IntPtr hwnd = FindControl(window, ctrl);
+                return IsWindowEnabled(hwnd) ? "OK:true" : "OK:false";
+            }
+            catch { return "OK:false"; }
         }
 
         static string DoWait(string appTitle, string[] parts)
