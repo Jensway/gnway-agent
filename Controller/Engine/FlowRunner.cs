@@ -161,10 +161,64 @@ namespace GnwayController.Engine
                 }
 
                 if (SnapshotMatches(evt))
-                    return true;
+                {
+                    // 控件存在且可用，进行 Data Stability Sniffing 保护
+                    if (WaitForDataStability(evt.WindowName, deadline))
+                    {
+                        return true;
+                    }
+                }
 
                 if (_timeoutSec > 0 && DateTime.Now >= deadline)
                     return false;
+
+                Thread.Sleep(500);
+            }
+            return false;
+        }
+
+        private bool WaitForDataStability(string windowName, DateTime deadline)
+        {
+            Log($"  ⏳ 控件已就位，正在等候窗口底层数据渲染稳定...", LogLevel.Wait);
+
+            int stableCount = 0;
+            string lastHash = "";
+            
+            while (_running)
+            {
+                WaitWhilePaused();
+                
+                if (_timeoutSec > 0 && DateTime.Now >= deadline)
+                    return false;
+
+                try
+                {
+                    string res = _client.Send($"treehash|{windowName}");
+                    if (res.StartsWith("OK:"))
+                    {
+                        string currentHash = res.Substring(3);
+                        if (currentHash == lastHash && !string.IsNullOrEmpty(currentHash))
+                        {
+                            stableCount++;
+                            if (stableCount >= 2) // 连续2次(约 1 秒)无变化即认为稳定
+                            {
+                                Log($"  ✅ 数据界面已稳定", LogLevel.Ok);
+                                return true;
+                            }
+                        }
+                        else
+                        {
+                            stableCount = 0;
+                            lastHash = currentHash;
+                        }
+                    }
+                    else
+                    {
+                        // 若由于弹窗消失等导致获取失败，可能是界面跳走，直接认为不稳定并退出嗅探交由外层继续抢占
+                        return false; 
+                    }
+                }
+                catch { }
 
                 Thread.Sleep(500);
             }
@@ -175,21 +229,25 @@ namespace GnwayController.Engine
         {
             try
             {
-                // 核心防超时优化：不再使用极度耗时的 listcontrols 获取上千个控件去比对
-                // 而是直接使用精准测试：检查目标窗口和目标控件是否已经存在
-                string checkCmd;
-                try { _client.Send("windows"); } catch { } // Force engine to grab new windows
                 if (!string.IsNullOrEmpty(evt.Action.ControlName))
                 {
-                    checkCmd = $"exists|{evt.WindowName}|{evt.Action.ControlName}";
+                    // 先测 exists，它内部已经在 Agent 端实现了多窗口查找降级
+                    string existsRes = _client.Send($"exists|{evt.WindowName}|{evt.Action.ControlName}");
+                    if (!existsRes.StartsWith("OK:true")) return false;
+
+                    // 若存在，对交互动作补充 isenabled 检查防冻结误触
+                    if (evt.Action.Type == "click" || evt.Action.Type == "input" || evt.Action.Type == "select")
+                    {
+                        string enabledRes = _client.Send($"isenabled|{evt.WindowName}|{evt.Action.ControlName}");
+                        if (!enabledRes.StartsWith("OK:true")) return false;
+                    }
+                    return true;
                 }
                 else
                 {
-                    checkCmd = $"windowexists|{evt.WindowName}";
+                    string result = _client.Send($"windowexists|{evt.WindowName}");
+                    return result.StartsWith("OK:true");
                 }
-
-                string result = _client.Send(checkCmd);
-                return result.StartsWith("OK:true");
             }
             catch { return false; }
         }

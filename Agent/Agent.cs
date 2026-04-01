@@ -174,31 +174,56 @@ namespace GnwayAgent
 
                 if (action == "windowexists") return FindWindowByTitle(appTitle) != IntPtr.Zero ? "OK:true" : "OK:false";
 
-                IntPtr window = FindWindowByTitle(appTitle);
-                if (window == IntPtr.Zero) throw new Exception($"Window not found: {appTitle}");
+                var matchingWindows = FindAllWindowsByTitle(appTitle);
+                if (matchingWindows.Count == 0) throw new Exception($"Window not found: {appTitle}");
 
                 if (action == "listcontrols" || action == "tree")
                 {
-                    DoListControlsStream(window, parts, writer);
+                    DoListControlsStream(matchingWindows[0], parts, writer);
                     return null;
                 }
-
-                return action switch
+                
+                if (action == "treehash")
                 {
-                    "click"      => DoClick(window, parts),
-                    "input"      => DoInput(window, parts),
-                    "sendkeys"   => DoSendKeys(window, parts),
-                    "gettext"    => DoGetText(window, parts),
-                    "select"     => DoSelect(window, parts),
-                    "exists"     => DoExists(window, parts),
-                    "isenabled"  => DoIsEnabled(window, parts),
-                    "popupinfo"  => DoPopupInfo(window, parts),
-                    "gridrows"   => DoGridRows(window, parts),
-                    "gridselect" => DoGridSelect(window, parts),
-                    "focus"      => DoFocus(window, parts),
-                    "wait"       => DoWait(appTitle, parts),
-                    _            => $"ERR:Unknown action [{action}]"
-                };
+                    return DoTreeHash(matchingWindows[0], parts);
+                }
+
+                if (action == "wait") return DoWait(appTitle, parts);
+
+                string? lastError = null;
+                foreach (var win in matchingWindows)
+                {
+                    try
+                    {
+                        string result = action switch
+                        {
+                            "click"      => DoClick(win, parts),
+                            "input"      => DoInput(win, parts),
+                            "sendkeys"   => DoSendKeys(win, parts),
+                            "gettext"    => DoGetText(win, parts),
+                            "select"     => DoSelect(win, parts),
+                            "exists"     => DoExists(win, parts),
+                            "isenabled"  => DoIsEnabled(win, parts),
+                            "popupinfo"  => DoPopupInfo(win, parts),
+                            "gridrows"   => DoGridRows(win, parts),
+                            "gridselect" => DoGridSelect(win, parts),
+                            "focus"      => DoFocus(win, parts),
+                            _            => $"ERR:Unknown action [{action}]"
+                        };
+
+                        // 如果操作明确返回了 OK:false (例如 exists 未找到控件)，也要继续尝试下一个窗口
+                        if (result != null && !result.StartsWith("ERR:") && result != "OK:false")
+                            return result;
+                        
+                        // 对于 OK:false 或 ERR，记录下来但不立即返回，以便尝试其它候选窗口
+                        if (result != null) lastError = result;
+                    }
+                    catch (Exception ex)
+                    {
+                        lastError = $"ERR:{ex.Message}";
+                    }
+                }
+                return lastError ?? "ERR:Action failed on all matching windows";
             }
             catch (Exception ex) { return $"ERR:{ex.Message}"; }
         }
@@ -218,6 +243,45 @@ namespace GnwayAgent
                 return true;
             }, IntPtr.Zero);
             return found;
+        }
+
+        static List<IntPtr> FindAllWindowsByTitle(string titlePattern)
+        {
+            var found = new List<IntPtr>();
+            EnumWindows((hWnd, lParam) =>
+            {
+                if (!IsWindowVisible(hWnd)) return true;
+                string title = GetWindowTextStr(hWnd);
+                if (title.Contains(titlePattern)) { found.Add(hWnd); }
+                return true;
+            }, IntPtr.Zero);
+            return found;
+        }
+
+        static string DoTreeHash(IntPtr window, string[] parts)
+        {
+            int hash = 0;
+            try
+            {
+                WalkWin32TreeForHash(window, ref hash);
+                return $"OK:{Math.Abs(hash)}";
+            }
+            catch (Exception ex) { return $"ERR:{ex.Message}"; }
+        }
+
+        static void WalkWin32TreeForHash(IntPtr root, ref int hash)
+        {
+            IntPtr child = GetWindow(root, GW_CHILD);
+            while (child != IntPtr.Zero)
+            {
+                hash = unchecked(hash * 31 + GetClassNameStr(child).GetHashCode());
+                string txt = GetWindowTextStr(child);
+                if (!string.IsNullOrEmpty(txt)) hash = unchecked(hash * 31 + txt.GetHashCode());
+                GetWindowRect(child, out RECT rect);
+                hash += (rect.Right - rect.Left); // Use width to mix hash
+                WalkWin32TreeForHash(child, ref hash);
+                child = GetWindow(child, GW_HWNDNEXT);
+            }
         }
 
         static IntPtr FindControl(IntPtr window, string controlName)
