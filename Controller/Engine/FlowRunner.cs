@@ -200,9 +200,9 @@ namespace GnwayController.Engine
                         if (currentHash == lastHash && !string.IsNullOrEmpty(currentHash))
                         {
                             stableCount++;
-                            if (stableCount >= 2) // 连续2次(约 1 秒)无变化即认为稳定
+                            if (stableCount >= 6) // 连续6次(约 3 秒)无变化即认为彻底稳定，防范多段式刷新
                             {
-                                Log($"  ✅ 数据界面已稳定", LogLevel.Ok);
+                                Log($"  ✅ 数据界面已彻底稳定", LogLevel.Ok);
                                 return true;
                             }
                         }

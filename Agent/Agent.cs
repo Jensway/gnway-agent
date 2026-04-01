@@ -501,10 +501,8 @@ namespace GnwayAgent
             
             IntPtr ctrl = FindControl(window, controlName);
             
-            // 确保窗口在最前且控件拥有焦点，防止 VB6 因为 ActiveControl / ActiveForm 空引用而报错
-            ShowWindow(window, 9); // SW_RESTORE
-            SetForegroundWindow(window);
-            SetFocus(ctrl);
+            // 强制将窗口拉回前台并激活，突破系统的 Foreground Lock 限制
+            ForceForegroundWindow(window);
             Thread.Sleep(100);
 
             // 鍏滃簳妯℃嫙鍧愭爣鐐瑰嚮
@@ -1013,6 +1011,31 @@ namespace GnwayAgent
         [DllImport("user32.dll")] static extern int GetWindowLong(IntPtr hWnd, int nIndex);
         [DllImport("user32.dll")] [return: MarshalAs(UnmanagedType.Bool)] static extern bool SetForegroundWindow(IntPtr hWnd);
         [DllImport("user32.dll")] static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+        [DllImport("user32.dll")] static extern IntPtr GetForegroundWindow();
+        [DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr hWnd, IntPtr ProcessId);
+        [DllImport("kernel32.dll")] static extern uint GetCurrentThreadId();
+        [DllImport("user32.dll")] static extern bool AttachThreadInput(uint idAttach, uint idAttachTo, bool fAttach);
+        [DllImport("user32.dll")] static extern bool BringWindowToTop(IntPtr hWnd);
+
+        static void ForceForegroundWindow(IntPtr hWnd)
+        {
+            IntPtr fgWnd = GetForegroundWindow();
+            if (fgWnd == hWnd) return;
+
+            uint fgThread = GetWindowThreadProcessId(fgWnd, IntPtr.Zero);
+            uint myThread = GetCurrentThreadId();
+            uint targetThread = GetWindowThreadProcessId(hWnd, IntPtr.Zero);
+
+            if (fgThread != myThread) AttachThreadInput(myThread, fgThread, true);
+            if (targetThread != myThread) AttachThreadInput(myThread, targetThread, true);
+
+            ShowWindow(hWnd, 9);
+            BringWindowToTop(hWnd);
+            SetForegroundWindow(hWnd);
+
+            if (fgThread != myThread) AttachThreadInput(myThread, fgThread, false);
+            if (targetThread != myThread) AttachThreadInput(myThread, targetThread, false);
+        }
 
         const uint GW_CHILD = 5;
         const uint GW_HWNDNEXT = 2;
