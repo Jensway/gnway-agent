@@ -347,21 +347,39 @@ namespace GnwayAgent
                 try {
                     var f = new System.Windows.Forms.Form {
                         FormBorderStyle = System.Windows.Forms.FormBorderStyle.None,
-                        BackColor = System.Drawing.Color.Red,
-                        TransparencyKey = System.Drawing.Color.Blue,
+                        BackColor = System.Drawing.Color.Magenta, // Transparency key
+                        TransparencyKey = System.Drawing.Color.Magenta,
                         TopMost = true,
                         ShowInTaskbar = false,
                         StartPosition = System.Windows.Forms.FormStartPosition.Manual,
-                        Bounds = rect
+                        Bounds = new System.Drawing.Rectangle(rect.X - 4, rect.Y - 4, rect.Width + 8, rect.Height + 8)
                     };
-                    var panel = new System.Windows.Forms.Panel {
-                        BackColor = System.Drawing.Color.Blue,
-                        Location = new System.Drawing.Point(3, 3),
-                        Size = new System.Drawing.Size(Math.Max(1, rect.Width - 6), Math.Max(1, rect.Height - 6))
-                    };
-                    f.Controls.Add(panel);
                     
-                    var tmr = new System.Windows.Forms.Timer { Interval = 1000 };
+                    f.Paint += (s, e) => {
+                        var pen = new System.Drawing.Pen(System.Drawing.Color.DeepSkyBlue, 3);
+                        var g = e.Graphics;
+                        int w = f.Width;
+                        int h = f.Height;
+                        int len = Math.Min(12, Math.Min(w/3, h/3)); // Corner bracket length
+                        if(len < 2) len = 2;
+                        
+                        // Top-Left
+                        g.DrawLine(pen, 2, 2, len, 2);
+                        g.DrawLine(pen, 2, 2, 2, len);
+                        // Top-Right
+                        g.DrawLine(pen, w - 3, 2, w - len, 2);
+                        g.DrawLine(pen, w - 3, 2, w - 3, len);
+                        // Bottom-Left
+                        g.DrawLine(pen, 2, h - 3, len, h - 3);
+                        g.DrawLine(pen, 2, h - 3, 2, h - len);
+                        // Bottom-Right
+                        g.DrawLine(pen, w - 3, h - 3, w - len, h - 3);
+                        g.DrawLine(pen, w - 3, h - 3, w - 3, h - len);
+                        
+                        pen.Dispose();
+                    };
+                    
+                    var tmr = new System.Windows.Forms.Timer { Interval = 600 };
                     tmr.Tick += (s, e) => { tmr.Stop(); f.Close(); };
                     tmr.Start();
                     
