@@ -501,6 +501,12 @@ namespace GnwayAgent
             
             IntPtr ctrl = FindControl(window, controlName);
             
+            // 确保窗口在最前且控件拥有焦点，防止 VB6 因为 ActiveControl / ActiveForm 空引用而报错
+            ShowWindow(window, 9); // SW_RESTORE
+            SetForegroundWindow(window);
+            SetFocus(ctrl);
+            Thread.Sleep(100);
+
             // 鍏滃簳妯℃嫙鍧愭爣鐐瑰嚮
             GetWindowRect(ctrl, out RECT rect);
             System.Drawing.Point pt;
@@ -536,9 +542,6 @@ namespace GnwayAgent
             mouse_event(MOUSEEVENTF_LEFTDOWN, pt.X, pt.Y, 0, 0);
             Thread.Sleep(50);
             mouse_event(MOUSEEVENTF_LEFTUP, pt.X, pt.Y, 0, 0);
-            
-            // 鍙戦€?BM_CLICK
-            SendMessage(ctrl, BM_CLICK, IntPtr.Zero, IntPtr.Zero);
             
             string coordMsg = parts.Length > 3 && !string.IsNullOrWhiteSpace(parts[3]) ? $"({parts[3]})" : "";
             return $"OK:Clicked [{controlName}]{coordMsg}";
@@ -1008,6 +1011,8 @@ namespace GnwayAgent
         [DllImport("user32.dll")] static extern void mouse_event(uint dwFlags, int dx, int dy, uint dwData, int dwExtraInfo);
         [DllImport("user32.dll")] static extern IntPtr GetParent(IntPtr hWnd);
         [DllImport("user32.dll")] static extern int GetWindowLong(IntPtr hWnd, int nIndex);
+        [DllImport("user32.dll")] [return: MarshalAs(UnmanagedType.Bool)] static extern bool SetForegroundWindow(IntPtr hWnd);
+        [DllImport("user32.dll")] static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
 
         const uint GW_CHILD = 5;
         const uint GW_HWNDNEXT = 2;
