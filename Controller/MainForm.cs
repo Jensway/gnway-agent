@@ -657,7 +657,8 @@ namespace GnwayController
                         Type        = cbA.Text,
                         ControlName = tbC.Text.Trim(),
                         Value       = tbV.Text.Trim(),
-                        MatchText   = tbV.Text.Trim() // 如果是 gridnext，把输入值作为匹配文本
+                        MatchText   = tbV.Text.Trim(),
+                        SleepMs     = cbA.Text == "sleep" && int.TryParse(tbV.Text.Trim(), out int ms) ? ms : 0
                     }
                 };
                 _store.Save(evt);
@@ -785,6 +786,9 @@ namespace GnwayController
                 ev.Action.ControlName = tbC.Text.Trim();
                 ev.Action.Value = tbV.Text.Trim();
                 ev.Action.MatchText = tbV.Text.Trim();
+                if (ev.Action.Type == "sleep" && int.TryParse(ev.Action.Value, out int ms)) {
+                    ev.Action.SleepMs = ms;
+                }
                 _store.Save(ev);
                 ReloadEvents();
             }

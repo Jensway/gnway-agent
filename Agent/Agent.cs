@@ -345,42 +345,48 @@ namespace GnwayAgent
             if (rect.Width <= 0 || rect.Height <= 0) return;
             var t = new Thread(() => {
                 try {
+                    int size = 64;
+                    int cx = rect.X + rect.Width / 2;
+                    int cy = rect.Y + rect.Height / 2;
+                    
                     var f = new System.Windows.Forms.Form {
                         FormBorderStyle = System.Windows.Forms.FormBorderStyle.None,
-                        BackColor = System.Drawing.Color.Magenta, // Transparency key
+                        BackColor = System.Drawing.Color.Magenta,
                         TransparencyKey = System.Drawing.Color.Magenta,
                         TopMost = true,
                         ShowInTaskbar = false,
                         StartPosition = System.Windows.Forms.FormStartPosition.Manual,
-                        Bounds = new System.Drawing.Rectangle(rect.X - 4, rect.Y - 4, rect.Width + 8, rect.Height + 8)
+                        Bounds = new System.Drawing.Rectangle(cx - size / 2, cy - size / 2, size, size)
                     };
                     
+                    int tickCount = 0;
                     f.Paint += (s, e) => {
-                        var pen = new System.Drawing.Pen(System.Drawing.Color.DeepSkyBlue, 3);
-                        var g = e.Graphics;
-                        int w = f.Width;
-                        int h = f.Height;
-                        int len = Math.Min(12, Math.Min(w/3, h/3)); // Corner bracket length
-                        if(len < 2) len = 2;
+                        e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
                         
-                        // Top-Left
-                        g.DrawLine(pen, 2, 2, len, 2);
-                        g.DrawLine(pen, 2, 2, 2, len);
-                        // Top-Right
-                        g.DrawLine(pen, w - 3, 2, w - len, 2);
-                        g.DrawLine(pen, w - 3, 2, w - 3, len);
-                        // Bottom-Left
-                        g.DrawLine(pen, 2, h - 3, len, h - 3);
-                        g.DrawLine(pen, 2, h - 3, 2, h - len);
-                        // Bottom-Right
-                        g.DrawLine(pen, w - 3, h - 3, w - len, h - 3);
-                        g.DrawLine(pen, w - 3, h - 3, w - 3, h - len);
+                        // 1. Center pulsing dot
+                        if (tickCount % 6 < 4) // Flash ratio
+                        {
+                            using (var brush = new System.Drawing.SolidBrush(System.Drawing.Color.OrangeRed))
+                                e.Graphics.FillEllipse(brush, size / 2 - 6, size / 2 - 6, 12, 12);
+                            using (var brush = new System.Drawing.SolidBrush(System.Drawing.Color.Yellow))
+                                e.Graphics.FillEllipse(brush, size / 2 - 3, size / 2 - 3, 6, 6);
+                        }
                         
-                        pen.Dispose();
+                        // 2. Expanding ripple
+                        int radius = 4 + tickCount * 2;
+                        if (radius < size / 2 - 2)
+                        {
+                            using (var pen = new System.Drawing.Pen(System.Drawing.Color.OrangeRed, 2))
+                                e.Graphics.DrawEllipse(pen, size / 2 - radius, size / 2 - radius, radius * 2, radius * 2);
+                        }
                     };
                     
-                    var tmr = new System.Windows.Forms.Timer { Interval = 600 };
-                    tmr.Tick += (s, e) => { tmr.Stop(); f.Close(); };
+                    var tmr = new System.Windows.Forms.Timer { Interval = 30 };
+                    tmr.Tick += (s, e) => { 
+                        tickCount++; 
+                        if (tickCount >= 20) { tmr.Stop(); f.Close(); } 
+                        else { f.Invalidate(); } 
+                    };
                     tmr.Start();
                     
                     System.Windows.Forms.Application.Run(f);
