@@ -708,7 +708,18 @@ namespace GnwayAgent
                 var ct = child.Current.ControlType;
                 if (ct == ControlType.DataItem || ct == ControlType.ListItem || ct == ControlType.TreeItem || ct == ControlType.Custom)
                 {
+                    bool isSelected = false;
+                    try {
+                        if (child.TryGetCurrentPattern(SelectionItemPattern.Pattern, out object? sp)) {
+                            isSelected = ((SelectionItemPattern)sp).Current.IsSelected;
+                        } else {
+                            isSelected = child.Current.HasKeyboardFocus;
+                        }
+                    } catch { }
+
                     var cols = new List<string>();
+                    cols.Add(isSelected ? "[SELECTED]" : "[UNSELECTED]");
+
                     var cell = walker.GetFirstChild(child);
                     while (cell != null)
                     {

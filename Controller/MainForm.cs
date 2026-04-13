@@ -90,12 +90,31 @@ namespace GnwayController
         // 当前控件树数据（type/name/enabled列表）
         List<ControlInfo> _treeData = new();
 
+        // 用于流程步骤UI状态显示
+        private int _currentStepIndex = -1;
+        private System.Windows.Forms.Timer _blinkTimer = new System.Windows.Forms.Timer { Interval = 400 };
+        private bool _blinkState = false;
+
         // =====================================================
         public MainForm()
         {
             string baseDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory);
             _store = new EventStore(baseDir);
             InitUI();
+
+            _blinkTimer.Tick += (s, e) => {
+                if (_currentStepIndex >= 0 && _currentStepIndex < _lvSteps.Items.Count) {
+                    _blinkState = !_blinkState;
+                    var item = _lvSteps.Items[_currentStepIndex];
+                    if (_blinkState) {
+                        item.Text = "▶ " + (_currentStepIndex + 1);
+                        item.BackColor = Color.FromArgb(250, 240, 240); // 浅红色高亮背景
+                    } else {
+                        item.Text = "   " + (_currentStepIndex + 1);
+                        item.BackColor = C_CARD;
+                    }
+                }
+            };
         }
 
         protected override void OnLoad(EventArgs e)
@@ -709,10 +728,11 @@ namespace GnwayController
             {
                 string stepId = _flowSteps[i];
                 var ev = _allEvents.FirstOrDefault(e => e.Id == stepId);
-                var item = new ListViewItem((i + 1).ToString());
+                var item = new ListViewItem("   " + (i + 1).ToString());
                 item.SubItems.Add(ev?.Name ?? stepId);
                 item.SubItems.Add(ev?.WindowName ?? "");
                 item.Tag = stepId;
+                item.ForeColor = Color.Gray; // 默认为灰色（待执行状态）
                 _lvSteps.Items.Add(item);
             }
         }
@@ -943,7 +963,11 @@ namespace GnwayController
             int timeoutSec  = (int)_nudTimeout.Value;
 
             _rtLog.Clear();
-            AppendLog($"▶ 流程启动，从第 {startStep + 1} 步，超时 {timeoutSec}s", C_OK);
+            // 每次启动时重置所有步骤状态
+            RefreshFlowListView();
+            _currentStepIndex = -1;
+            _blinkTimer.Start();
+            AppendLog($"▶ 流程启动，从第 {startStep + 1} 步，超时 {timeoutSec}s(等待中)", C_OK);
 
             var client = new AgentClient(_tbServer.Text.Trim());
             _runner = new FlowRunner(client, _allEvents, _flowSteps,
@@ -969,17 +993,63 @@ namespace GnwayController
         {
             if (InvokeRequired) { Invoke((Action)(() => OnRunnerEvent(evt))); return; }
 
-            AppendLog($"[{DateTime.Now:HH:mm:ss}] {evt.Message}", evt.Level);
+            // 优化了执行日志的显示，对不同级别的日志进行了格式化
+            string logPrefix = evt.Level == LogLevel.Ok ? "[成功]" : evt.Level == LogLevel.Error ? "[错误]" : evt.Level == LogLevel.Warn ? "[警告]" : "[信息]";
+            AppendLog($"[{DateTime.Now:HH:mm:ss}] {logPrefix} {evt.Message}", evt.Level);
 
             switch (evt.Type)
             {
+                case EngineEventType.StateChanged:
+                    // 清理上一个步骤的状态为绿色（完成）
+                    if (_currentStepIndex >= 0 && _currentStepIndex < _lvSteps.Items.Count)
+                    {
+                        var prevItem = _lvSteps.Items[_currentStepIndex];
+                        prevItem.Text = "✓ " + (_currentStepIndex + 1);
+                        prevItem.BackColor = C_CARD;
+                        prevItem.ForeColor = Color.Green;
+                    }
+                    
+                    _currentStepIndex = evt.Round; // 获取当前正在执行的步骤索引
+
+                    // 设置当前步骤为红色（正在执行），并启动闪烁
+                    if (_currentStepIndex >= 0 && _currentStepIndex < _lvSteps.Items.Count)
+                    {
+                        var curItem = _lvSteps.Items[_currentStepIndex];
+                        curItem.ForeColor = Color.Red;
+                        _blinkState = true;
+                        curItem.Text = "▶ " + (_currentStepIndex + 1);
+                        _lvSteps.EnsureVisible(_currentStepIndex); // 自动滚动
+                    }
+                    break;
+
                 case EngineEventType.Completed:
-                case EngineEventType.Error:
+                    if (_currentStepIndex >= 0 && _currentStepIndex < _lvSteps.Items.Count)
+                    {
+                        var lastItem = _lvSteps.Items[_currentStepIndex];
+                        lastItem.Text = "✓ " + (_currentStepIndex + 1);
+                        lastItem.BackColor = C_CARD;
+                        lastItem.ForeColor = Color.Green;
+                    }
                     SetRunning(false);
                     break;
+
+                case EngineEventType.Error:
+                    SetRunning(false);
+                    if (_currentStepIndex >= 0 && _currentStepIndex < _lvSteps.Items.Count)
+                    {
+                        var errItem = _lvSteps.Items[_currentStepIndex];
+                        errItem.Text = "✗ " + (_currentStepIndex + 1);
+                        errItem.BackColor = Color.FromArgb(255, 230, 230);
+                        errItem.ForeColor = Color.DarkRed;
+                    }
+                    break;
+
                 case EngineEventType.Paused:
                     _btnPause.Text = "▶ 继续";
+                    if (_currentStepIndex >= 0 && _currentStepIndex < _lvSteps.Items.Count)
+                        _lvSteps.Items[_currentStepIndex].BackColor = Color.LightYellow;
                     break;
+
                 case EngineEventType.Resumed:
                     _btnPause.Text = "⏸ 暂停";
                     break;
@@ -988,6 +1058,7 @@ namespace GnwayController
 
         private void SetRunning(bool running)
         {
+            if (!running && _blinkTimer.Enabled) _blinkTimer.Stop();
             _btnStart.Enabled = !running;
             _btnPause.Enabled = running;
             _btnStop.Enabled  = running;

@@ -98,7 +98,7 @@ namespace GnwayController.Engine
 
                     Emit(EngineEventType.StateChanged,
                          $"步骤 {current + 1}/{count}：{evt.Name}",
-                         LogLevel.Info, stateId: stepId);
+                         LogLevel.Info, stateId: stepId, round: current);
 
                     // ── 等待控件树匹配 ───────────────────────
                     Log($"  ⏳ 等待窗口 [{evt.WindowName}] 控件树就绪...", LogLevel.Wait);
@@ -336,26 +336,51 @@ namespace GnwayController.Engine
                                   .Split(new[] { '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries);
 
             int foundIdx = -1;
+            int selectedPendingIdx = -1;
+
             for (int i = 0; i < lines.Length; i++)
             {
-                var cols = lines[i].Split('\t');
+                var parts = lines[i].Split(new[] { '\t' }, 2);
+                bool isSelected = parts.Length > 0 && parts[0] == "[SELECTED]";
+                string rowData = parts.Length > 1 ? parts[1] : lines[i];
+
+                var cols = rowData.Split('\t');
                 // 若 ColIndex 在范围内就按列检查，否则检查整行
                 bool hit = a.ColIndex < cols.Length
                     ? cols[a.ColIndex].Contains(a.MatchText)
-                    : lines[i].Contains(a.MatchText);
-                if (hit) { foundIdx = i; break; }
+                    : rowData.Contains(a.MatchText);
+                
+                if (hit)
+                {
+                    if (isSelected) {
+                        selectedPendingIdx = i;
+                        break;
+                    }
+                    if (foundIdx < 0) {
+                        foundIdx = i;
+                    }
+                }
             }
 
-            if (foundIdx < 0)
+            int targetIdx = selectedPendingIdx >= 0 ? selectedPendingIdx : foundIdx;
+
+            if (targetIdx < 0)
             {
                 Log($"  ✅ 表格中已无「{a.MatchText}」行，全部处理完成", LogLevel.Ok);
                 return true; // 通知 RunLoop 流程完成
             }
 
-            string selResult = _client.Send(
-                $"gridselect|{evt.WindowName}|{a.ControlName}|{foundIdx}");
-            Log($"  → 选行 [{a.ControlName}] 第{foundIdx}行（含\"{a.MatchText}\"）：{OkOrErr(selResult)}",
-                selResult.StartsWith("OK") ? LogLevel.Ok : LogLevel.Warn);
+            if (targetIdx == selectedPendingIdx)
+            {
+                Log($"  → 当前第{targetIdx}行已选中且含\"{a.MatchText}\"，直接处理，跳过选中步骤", LogLevel.Ok);
+            }
+            else
+            {
+                string selResult = _client.Send(
+                    $"gridselect|{evt.WindowName}|{a.ControlName}|{targetIdx}");
+                Log($"  → 选行 [{a.ControlName}] 第{targetIdx}行（含\"{a.MatchText}\"）：{OkOrErr(selResult)}",
+                    selResult.StartsWith("OK") ? LogLevel.Ok : LogLevel.Warn);
+            }
 
             return false;
         }
