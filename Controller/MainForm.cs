@@ -82,11 +82,7 @@ namespace GnwayController
         RichTextBox    _rtLog      = null!;
 
         // ── 双模状态 ────────────────────────────────────────
-        bool _isStudioMode = false;
-        Panel _pnlAssistantRoot = null!;
-        Panel _pnlStudioRoot = null!;
-        Panel _pnlAssistantBody = null!;
-        Panel _flowContainer = null!;
+
         SplitContainer _innerSplit = null!;
 
         // ── 状态 ──────────────────────────────────────────────
@@ -153,8 +149,7 @@ namespace GnwayController
             toolbar.Paint += (s, e) =>
                 e.Graphics.DrawLine(new Pen(C_BORDER), 0, toolbar.Height - 1, toolbar.Width, toolbar.Height - 1);
             // 将配置类工具栏直接装入设计器面板中，小助手模式不显示
-            _pnlStudioRoot.Controls.Add(toolbar);
-            _pnlStudioRoot.Controls.SetChildIndex(toolbar, 0);
+            Controls.Add(toolbar);
 
             int x = 10;
             toolbar.Controls.Add(Lbl("服务器 IP", toolbar, new Point(x, 8)));
@@ -370,23 +365,23 @@ namespace GnwayController
         // ── 右下：流程步骤 + 执行控制 + 日志 ─────────────────
         private void BuildFlowPanel(SplitterPanel panel)
         {
-            var innerSplit = new SplitContainer {
+            _innerSplit = new SplitContainer {
                 Dock = DockStyle.Fill,
                 Orientation = Orientation.Horizontal,
                 SplitterWidth = 5,
                 BackColor = C_BG,
                 Panel1MinSize = 160
             };
-            panel.Controls.Add(innerSplit);
+            panel.Controls.Add(_innerSplit);
             this.Load += (_, __) => {
                 _innerSplit.SplitterDistance = (int)(_innerSplit.Height * 0.55);
             };
 
             // ── 上半：流程步骤列表 ────────────────────────────
-            SectionHeader("流程步骤", __innerSplit.Panel1, DockStyle.Top);
+            SectionHeader("流程步骤", _innerSplit.Panel1, DockStyle.Top);
 
             var stepBtnBar = new Panel { Dock = DockStyle.Top, Height = 32, BackColor = C_CARD };
-            __innerSplit.Panel1.Controls.Add(stepBtnBar);
+            _innerSplit.Panel1.Controls.Add(stepBtnBar);
             int sx = 4;
             _btnStepAdd = Btn("+ 添加选中", stepBtnBar, new Point(sx, 4), 90, C_ACCENT, Color.White); sx += 96;
             _btnStepAdd.Click += OnStepAdd;
@@ -412,14 +407,14 @@ namespace GnwayController
             _lvSteps.Columns.Add("事件名", 140);
             _lvSteps.Columns.Add("窗口",   200);
             _lvSteps.KeyDown += OnListViewCopy;
-            __innerSplit.Panel1.Controls.Add(_lvSteps);
+            _innerSplit.Panel1.Controls.Add(_lvSteps);
             _lvSteps.BringToFront(); // [!!! FIX MANGLED RIGHT-BOTTOM-LEFT PANEL (FLOW STEPS) OVERLAP !!!]
 
             // ── 下半：执行控制 + 日志 ─────────────────────────
-            SectionHeader("执行控制 & 日志", __innerSplit.Panel2, DockStyle.Top);
+            SectionHeader("执行控制 & 日志", _innerSplit.Panel2, DockStyle.Top);
 
             var execBar = new Panel { Dock = DockStyle.Top, Height = 40, BackColor = C_CARD };
-            __innerSplit.Panel2.Controls.Add(execBar);
+            _innerSplit.Panel2.Controls.Add(execBar);
 
             execBar.Controls.Add(Lbl("从第", execBar, new Point(6, 10)));
             _nudStart = new NumericUpDown {
@@ -453,7 +448,7 @@ namespace GnwayController
                 Font = F_LOG, BorderStyle = BorderStyle.FixedSingle,
                 ReadOnly = true, ScrollBars = RichTextBoxScrollBars.Vertical
             };
-            __innerSplit.Panel2.Controls.Add(_rtLog);
+            _innerSplit.Panel2.Controls.Add(_rtLog);
             _rtLog.BringToFront(); // [!!! FIX MANGLED RIGHT-BOTTOM-RIGHT PANEL (LOG TEXTBOX) OVERLAP !!!]
         }
 
