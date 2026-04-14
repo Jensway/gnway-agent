@@ -363,7 +363,7 @@ namespace GnwayAgent
             if (rect.Width <= 0 || rect.Height <= 0) return;
             var t = new Thread(() => {
                 try {
-                    int size = 120; 
+                    int size = 80; 
                     int cx = rect.X + rect.Width / 2;
                     int cy = rect.Y + rect.Height / 2;
                     
@@ -381,31 +381,33 @@ namespace GnwayAgent
                     int tickCount = 0;
                     f.Paint += (s, e) => {
                         e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
-                        // Avoid clearing to Magenta repeatedly as it can cause flickering
-                        // We rely on the initial TransparencyKey and BackColor setup
-                        
-                        // 1. 中心圆心点 (黄色小点)
-                        if (tickCount % 6 < 4) // 控制高频闪烁节奏
+
+                        int center = size / 2;
+
+                        // 1. 激光瞄准十字线 (Laser Crosshair)
+                        using (var pen = new System.Drawing.Pen(System.Drawing.Color.Red, 2))
                         {
-                            using (var brush = new System.Drawing.SolidBrush(System.Drawing.Color.Yellow))
-                                e.Graphics.FillEllipse(brush, size / 2 - 4, size / 2 - 4, 8, 8);
-                            using (var pen = new System.Drawing.Pen(System.Drawing.Color.Red, 2))
-                                e.Graphics.DrawEllipse(pen, size / 2 - 8, size / 2 - 8, 16, 16);
-                        }
-                        
-                        // 2. 扩散的雷达波纹 (更粗，不使用抗锯齿可能更好避免 Magenta halo，这里改用稍浅的颜色)
-                        int radius = 4 + tickCount * 4;
-                        if (radius < size / 2 - 2)
-                        {
-                            using (var pen = new System.Drawing.Pen(System.Drawing.Color.Red, 4))
-                                e.Graphics.DrawEllipse(pen, size / 2 - radius, size / 2 - radius, radius * 2, radius * 2);
+                            e.Graphics.DrawLine(pen, center, 4, center, center - 10); // 上
+                            e.Graphics.DrawLine(pen, center, center + 10, center, size - 4); // 下
+                            e.Graphics.DrawLine(pen, 4, center, center - 10, center); // 左
+                            e.Graphics.DrawLine(pen, center + 10, center, size - 4, center); // 右
                         }
 
-                        int radius2 = radius - 24;
-                        if (radius2 > 4 && radius2 < size / 2 - 2)
+                        // 2. 收缩聚焦环 (Implosion focus ring)
+                        int focusRadius = 30 - tickCount * 2;
+                        if (focusRadius > 6)
                         {
-                            using (var pen = new System.Drawing.Pen(System.Drawing.Color.DarkOrange, 3))
-                                e.Graphics.DrawEllipse(pen, size / 2 - radius2, size / 2 - radius2, radius2 * 2, radius2 * 2);
+                            using (var pen = new System.Drawing.Pen(System.Drawing.Color.OrangeRed, 3))
+                                e.Graphics.DrawEllipse(pen, center - focusRadius, center - focusRadius, focusRadius * 2, focusRadius * 2);
+                        }
+
+                        // 3. 中心激光红点 (Laser dot, 高频闪烁)
+                        if (tickCount % 4 < 3) 
+                        {
+                            using (var brush = new System.Drawing.SolidBrush(System.Drawing.Color.Red))
+                                e.Graphics.FillEllipse(brush, center - 4, center - 4, 8, 8);
+                            using (var brush = new System.Drawing.SolidBrush(System.Drawing.Color.Yellow))
+                                e.Graphics.FillEllipse(brush, center - 2, center - 2, 4, 4);
                         }
                     };
                     
