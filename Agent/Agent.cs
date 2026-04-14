@@ -340,57 +340,92 @@ namespace GnwayAgent
 
             throw new Exception($"Control not found: [{controlName}]");
         }
+        [DllImport("user32.dll")]
+        static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int X, int Y, int cx, int cy, uint uFlags);
+        static readonly IntPtr HWND_TOPMOST = new IntPtr(-1);
+
+        class RadarForm : System.Windows.Forms.Form
+        {
+            protected override System.Windows.Forms.CreateParams CreateParams
+            {
+                get
+                {
+                    var cp = base.CreateParams;
+                    // WS_EX_LAYERED (0x80000) | WS_EX_TRANSPARENT (0x20)
+                    cp.ExStyle |= 0x80020;
+                    return cp;
+                }
+            }
+        }
+
         static void ShowClickHighlight(System.Drawing.Rectangle rect)
         {
             if (rect.Width <= 0 || rect.Height <= 0) return;
             var t = new Thread(() => {
                 try {
-                    int size = 64;
+                    int size = 120; 
                     int cx = rect.X + rect.Width / 2;
                     int cy = rect.Y + rect.Height / 2;
                     
-                    var f = new System.Windows.Forms.Form {
+                    var f = new RadarForm {
                         FormBorderStyle = System.Windows.Forms.FormBorderStyle.None,
                         BackColor = System.Drawing.Color.Magenta,
                         TransparencyKey = System.Drawing.Color.Magenta,
                         TopMost = true,
                         ShowInTaskbar = false,
                         StartPosition = System.Windows.Forms.FormStartPosition.Manual,
+                        AutoScaleMode = System.Windows.Forms.AutoScaleMode.None,
                         Bounds = new System.Drawing.Rectangle(cx - size / 2, cy - size / 2, size, size)
                     };
                     
                     int tickCount = 0;
                     f.Paint += (s, e) => {
                         e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+                        // Avoid clearing to Magenta repeatedly as it can cause flickering
+                        // We rely on the initial TransparencyKey and BackColor setup
                         
-                        // 1. Center pulsing dot
-                        if (tickCount % 6 < 4) // Flash ratio
+                        // 1. 中心圆心点 (黄色小点)
+                        if (tickCount % 6 < 4) // 控制高频闪烁节奏
                         {
-                            using (var brush = new System.Drawing.SolidBrush(System.Drawing.Color.OrangeRed))
-                                e.Graphics.FillEllipse(brush, size / 2 - 6, size / 2 - 6, 12, 12);
                             using (var brush = new System.Drawing.SolidBrush(System.Drawing.Color.Yellow))
-                                e.Graphics.FillEllipse(brush, size / 2 - 3, size / 2 - 3, 6, 6);
+                                e.Graphics.FillEllipse(brush, size / 2 - 4, size / 2 - 4, 8, 8);
+                            using (var pen = new System.Drawing.Pen(System.Drawing.Color.Red, 2))
+                                e.Graphics.DrawEllipse(pen, size / 2 - 8, size / 2 - 8, 16, 16);
                         }
                         
-                        // 2. Expanding ripple
-                        int radius = 4 + tickCount * 2;
+                        // 2. 扩散的雷达波纹 (更粗，不使用抗锯齿可能更好避免 Magenta halo，这里改用稍浅的颜色)
+                        int radius = 4 + tickCount * 4;
                         if (radius < size / 2 - 2)
                         {
-                            using (var pen = new System.Drawing.Pen(System.Drawing.Color.OrangeRed, 2))
+                            using (var pen = new System.Drawing.Pen(System.Drawing.Color.Red, 4))
                                 e.Graphics.DrawEllipse(pen, size / 2 - radius, size / 2 - radius, radius * 2, radius * 2);
+                        }
+
+                        int radius2 = radius - 24;
+                        if (radius2 > 4 && radius2 < size / 2 - 2)
+                        {
+                            using (var pen = new System.Drawing.Pen(System.Drawing.Color.DarkOrange, 3))
+                                e.Graphics.DrawEllipse(pen, size / 2 - radius2, size / 2 - radius2, radius2 * 2, radius2 * 2);
                         }
                     };
                     
                     var tmr = new System.Windows.Forms.Timer { Interval = 30 };
                     tmr.Tick += (s, e) => { 
                         tickCount++; 
-                        if (tickCount >= 20) { tmr.Stop(); f.Close(); } 
-                        else { f.Invalidate(); } 
+                        if (tickCount >= 25) { tmr.Stop(); f.Close(); } 
+                        else {
+                            SetWindowPos(f.Handle, HWND_TOPMOST, 0, 0, 0, 0, 0x0002 | 0x0001 | 0x0010 /* SWP_NOACTIVATE */);
+                            f.Invalidate(); 
+                        } 
                     };
-                    tmr.Start();
+                    
+                    f.Load += (s, e) => {
+                        SetWindowPos(f.Handle, HWND_TOPMOST, 0, 0, 0, 0, 0x0002 | 0x0001 | 0x0010);
+                        tmr.Start();
+                    };
                     
                     System.Windows.Forms.Application.Run(f);
-                } catch { }
+                } catch { } 
             });
             t.SetApartmentState(ApartmentState.STA);
             t.IsBackground = true;
@@ -697,6 +732,9 @@ namespace GnwayAgent
             IntPtr grid = FindControl(window, parts[2]);
             int maxRows = parts.Length > 3 && int.TryParse(parts[3], out int m) ? m : 500;
             
+            ForceForegroundWindow(window);
+            Thread.Sleep(150);
+
             var el = AutomationElement.FromHandle(grid);
             var sb = new StringBuilder("OK:\n");
             var walker = TreeWalker.ControlViewWalker;

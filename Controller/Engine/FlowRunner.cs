@@ -322,7 +322,6 @@ namespace GnwayController.Engine
             return false; // 未完成，继续循环
         }
 
-        /// <summary>gridnext 逻辑：读取所有行，找第一条含 MatchText 的，选中它</summary>
         private bool ExecuteGridNext(AutoEvent evt, EventAction a)
         {
             string rowsResult = _client.Send($"gridrows|{evt.WindowName}|{a.ControlName}");
@@ -335,8 +334,8 @@ namespace GnwayController.Engine
             var lines = rowsResult.Substring(3)
                                   .Split(new[] { '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries);
 
-            int foundIdx = -1;
-            int selectedPendingIdx = -1;
+            int selectedIdx = -1;
+            List<int> hitIndices = new List<int>();
 
             for (int i = 0; i < lines.Length; i++)
             {
@@ -344,38 +343,48 @@ namespace GnwayController.Engine
                 bool isSelected = parts.Length > 0 && parts[0] == "[SELECTED]";
                 string rowData = parts.Length > 1 ? parts[1] : lines[i];
 
+                if (isSelected) selectedIdx = i;
+
                 var cols = rowData.Split('\t');
-                // 若 ColIndex 在范围内就按列检查，否则检查整行
                 bool hit = a.ColIndex < cols.Length
                     ? cols[a.ColIndex].Contains(a.MatchText)
                     : rowData.Contains(a.MatchText);
                 
                 if (hit)
                 {
-                    if (isSelected) {
-                        selectedPendingIdx = i;
-                        break;
-                    }
-                    if (foundIdx < 0) {
-                        foundIdx = i;
-                    }
+                    hitIndices.Add(i);
                 }
             }
 
-            int targetIdx = selectedPendingIdx >= 0 ? selectedPendingIdx : foundIdx;
-
-            if (targetIdx < 0)
+            if (hitIndices.Count == 0)
             {
                 Log($"  ✅ 表格中已无「{a.MatchText}」行，全部处理完成", LogLevel.Ok);
                 return true; // 通知 RunLoop 流程完成
             }
 
-            if (targetIdx == selectedPendingIdx)
+            int targetIdx = -1;
+
+            // 优先检查当前选中行是否待处理
+            if (selectedIdx >= 0 && hitIndices.Contains(selectedIdx))
             {
+                targetIdx = selectedIdx;
                 Log($"  → 当前第{targetIdx}行已选中且含\"{a.MatchText}\"，直接处理，跳过选中步骤", LogLevel.Ok);
             }
             else
             {
+                // 若当前行不是待处理，或者未识别到选中行，则尝试寻找选中行之后的待处理行
+                targetIdx = hitIndices.FirstOrDefault(idx => idx > selectedIdx);
+                if (targetIdx == 0 && !hitIndices.Contains(0) && selectedIdx < 0) 
+                {
+                    // Fallback
+                    targetIdx = hitIndices[0]; 
+                }
+                else if (targetIdx <= 0 && selectedIdx >= 0) 
+                {
+                    // 如果选中行之后没有了，就回到顶部找第一个
+                    targetIdx = hitIndices[0];
+                }
+
                 string selResult = _client.Send(
                     $"gridselect|{evt.WindowName}|{a.ControlName}|{targetIdx}");
                 Log($"  → 选行 [{a.ControlName}] 第{targetIdx}行（含\"{a.MatchText}\"）：{OkOrErr(selResult)}",
@@ -390,11 +399,14 @@ namespace GnwayController.Engine
         // =====================================================
         private void WaitWhilePaused()
         {
+            bool wasPaused = _paused;
             if (_paused)
                 Emit(EngineEventType.Paused, "⏸ 已暂停", LogLevel.Warn);
+            
             while (_paused && _running)
                 Thread.Sleep(200);
-            if (!_paused && _running)
+            
+            if (wasPaused && !_paused && _running)
                 Emit(EngineEventType.Resumed, "▶ 已继续", LogLevel.Ok);
         }
 
