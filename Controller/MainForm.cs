@@ -85,6 +85,13 @@ namespace GnwayController
 
         SplitContainer _innerSplit = null!;
 
+        // ── 双模状态 ────────────────────────────────────────
+        bool _isStudioMode = false;
+        Panel _pnlAssistantRoot = null!;
+        Panel _pnlStudioRoot = null!;
+        Panel _pnlAssistantBody = null!;
+        Panel _flowContainer = null!;
+
         // ── 状态 ──────────────────────────────────────────────
         EventStore         _store     = null!;
         List<AutoEvent>    _allEvents = new();
