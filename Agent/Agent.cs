@@ -363,7 +363,7 @@ namespace GnwayAgent
             if (rect.Width <= 0 || rect.Height <= 0) return;
             var t = new Thread(() => {
                 try {
-                    int size = 80; 
+                    int size = 60; 
                     int cx = rect.X + rect.Width / 2;
                     int cy = rect.Y + rect.Height / 2;
                     
@@ -382,32 +382,38 @@ namespace GnwayAgent
                     f.Paint += (s, e) => {
                         e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
 
-                        int center = size / 2;
+                        // 上下呼吸弹跳偏移 (利用正弦波产生平滑的上下浮动)
+                        float yOffset = (float)(Math.Sin(tickCount * 0.4) * 4); 
+                        e.Graphics.TranslateTransform(0, yOffset - 5); // 稍微往上提一点，让箭头尖端指向目标
 
-                        // 1. 激光瞄准十字线 (Laser Crosshair)
-                        using (var pen = new System.Drawing.Pen(System.Drawing.Color.Red, 2))
-                        {
-                            e.Graphics.DrawLine(pen, center, 4, center, center - 10); // 上
-                            e.Graphics.DrawLine(pen, center, center + 10, center, size - 4); // 下
-                            e.Graphics.DrawLine(pen, 4, center, center - 10, center); // 左
-                            e.Graphics.DrawLine(pen, center + 10, center, size - 4, center); // 右
+                        // 绘制一个非常小巧、精致的指示箭头 (整体宽度约16像素，高度22像素)
+                        var points = new System.Drawing.PointF[] {
+                            new System.Drawing.PointF(30, 32), // 箭头尖端
+                            new System.Drawing.PointF(22, 20), // 箭头左侧底翼
+                            new System.Drawing.PointF(27, 20), // 箭尾柄左内侧凹点
+                            new System.Drawing.PointF(27, 10), // 箭尾柄左侧顶部
+                            new System.Drawing.PointF(33, 10), // 箭尾柄右侧顶部
+                            new System.Drawing.PointF(33, 20), // 箭尾柄右内侧凹点
+                            new System.Drawing.PointF(38, 20)  // 箭头右侧底翼
+                        };
+
+                        // 绘制阴影以增加立体和现代感
+                        var shadowPoints = new System.Drawing.PointF[points.Length];
+                        for(int i = 0; i < points.Length; i++) {
+                            shadowPoints[i] = new System.Drawing.PointF(points[i].X + 2, points[i].Y + 3);
                         }
+                        using (var shadowBrush = new System.Drawing.SolidBrush(System.Drawing.Color.FromArgb(80, 0, 0, 0)))
+                            e.Graphics.FillPolygon(shadowBrush, shadowPoints);
 
-                        // 2. 收缩聚焦环 (Implosion focus ring)
-                        int focusRadius = 30 - tickCount * 2;
-                        if (focusRadius > 6)
-                        {
-                            using (var pen = new System.Drawing.Pen(System.Drawing.Color.OrangeRed, 3))
-                                e.Graphics.DrawEllipse(pen, center - focusRadius, center - focusRadius, focusRadius * 2, focusRadius * 2);
-                        }
+                        // 绘制箭头主体内容（亮黄色填充）
+                        using (var brush = new System.Drawing.SolidBrush(System.Drawing.Color.FromArgb(250, 204, 21))) // 充满活力的黄
+                            e.Graphics.FillPolygon(brush, points);
 
-                        // 3. 中心激光红点 (Laser dot, 高频闪烁)
-                        if (tickCount % 4 < 3) 
+                        // 绘制箭头边缘轮廓（深色或白色边框）
+                        using (var pen = new System.Drawing.Pen(System.Drawing.Color.White, 2f))
                         {
-                            using (var brush = new System.Drawing.SolidBrush(System.Drawing.Color.Red))
-                                e.Graphics.FillEllipse(brush, center - 4, center - 4, 8, 8);
-                            using (var brush = new System.Drawing.SolidBrush(System.Drawing.Color.Yellow))
-                                e.Graphics.FillEllipse(brush, center - 2, center - 2, 4, 4);
+                            pen.LineJoin = System.Drawing.Drawing2D.LineJoin.Round;
+                            e.Graphics.DrawPolygon(pen, points);
                         }
                     };
                     
