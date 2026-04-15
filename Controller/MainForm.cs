@@ -178,28 +178,31 @@ namespace GnwayController
             _btnRefreshWins.Click += OnGetWindows;
             toolbar.Controls.Add(_btnRefreshWins); x += 120;
 
-            // ── 根布局双模容器 ────────────────────────────────────────
-            _pnlAssistantRoot = new Panel { Dock = DockStyle.Fill, Visible = true, BackColor = C_BG };
-            _pnlStudioRoot = new Panel { Dock = DockStyle.Fill, Visible = false, BackColor = C_BG };
+            // ── 根布局双模容器 (TabControl) ──────────────────────────
+            var mainTabs = new TabControl { Dock = DockStyle.Fill, Font = new Font("Segoe UI", 9.5f) };
+            Controls.Add(mainTabs);
+
+            var tabAssistant = new TabPage("执行助手");
+            var tabStudio = new TabPage("开发设计工作台");
+
+            mainTabs.TabPages.Add(tabAssistant);
+            mainTabs.TabPages.Add(tabStudio);
+
+            _pnlAssistantRoot = new Panel { Dock = DockStyle.Fill, Visible = true, BackColor = Color.White };
+            _pnlStudioRoot = new Panel { Dock = DockStyle.Fill, Visible = true, BackColor = C_BG };
             
-            Controls.Add(_pnlAssistantRoot);
-            Controls.Add(_pnlStudioRoot);
+            tabAssistant.Controls.Add(_pnlAssistantRoot);
+            tabStudio.Controls.Add(_pnlStudioRoot);
             
             _pnlStudioRoot.Controls.Add(toolbar);
             _pnlStudioRoot.Controls.SetChildIndex(toolbar, 0);
 
-            // 【模式】设计器模式内容 (挂载原逻辑)
+            // 【模式】设计器模式内容
             var split = new SplitContainer {
                 Dock = DockStyle.Fill, SplitterWidth = 5, BackColor = C_BG, Orientation = Orientation.Vertical, Panel1MinSize = 280
             };
             
-            // 为设计器模式添加一个顶部工具栏（返回小助手用）
-            var studioNav = new Panel { Dock = DockStyle.Top, Height = 45, BackColor = C_HDR_BG };
-            var btnGoAsst = Btn("← 退出设计器，返回执行助手", studioNav, new Point(12, 8), 240, Color.FromArgb(50, 255, 255, 255), Color.White);
-            btnGoAsst.Click += (_, __) => SwitchMode(false);
-            
             _pnlStudioRoot.Controls.Add(split);
-            _pnlStudioRoot.Controls.Add(studioNav);
             split.BringToFront(); // 修复叠加问题
             
             this.Load += (_, __) => { try { split.SplitterDistance = (int)(ClientSize.Width * 0.55); } catch { } };
@@ -208,56 +211,55 @@ namespace GnwayController
             BuildRightPanel(split.Panel2);
 
             // 【模式】小助手模式内容
-            var asstTop = new Panel { Dock = DockStyle.Top, Height = 64, BackColor = C_HDR_BG };
-            _pnlAssistantRoot.Controls.Add(asstTop);
-            
-            var asstTitle = new Label { Text = "GnwayAgent 执行助手", ForeColor = Color.White, Font = new Font("Segoe UI", 12f, FontStyle.Bold), Location = new Point(16, 20), AutoSize = true };
-            asstTop.Controls.Add(asstTitle);
-
-            var btnGoStudio = Btn("⚙️ 开发设计模式", asstTop, new Point(10, 16), 120, Color.FromArgb(50, 255, 255, 255), Color.White);
-            asstTop.Resize += (s, e) => btnGoStudio.Left = asstTop.Width - 140;
-            btnGoStudio.Click += (_, __) => SwitchMode(true);
-            asstTop.Controls.Add(btnGoStudio);
-
             _pnlAssistantBody = new Panel { Dock = DockStyle.Fill, BackColor = Color.White, Padding = new Padding(12) };
             _pnlAssistantRoot.Controls.Add(_pnlAssistantBody);
             _pnlAssistantBody.BringToFront();
 
-            // 软件启动时，进入小助手模式
-            this.Load += (_, __) => SwitchMode(false);
-        }
-
-        private void SwitchMode(bool toStudio)
-        {
-            _isStudioMode = toStudio;
-            if (toStudio)
-            {
-                _pnlAssistantRoot.Visible = false;
-                _pnlStudioRoot.Visible = true;
-                this.Size = new Size(1300, 780);
-                this.FormBorderStyle = FormBorderStyle.Sizable;
-                this.MaximizeBox = true;
-                this.CenterToScreen();
-
-                if (_flowContainer != null && _innerSplit != null)
+            // 监听标签页切换，动态调整窗口和流程模块位置
+            mainTabs.SelectedIndexChanged += (s, e) => {
+                bool toStudio = (mainTabs.SelectedIndex == 1);
+                _isStudioMode = toStudio;
+                if (toStudio)
                 {
-                    _flowContainer.Controls.Add(_innerSplit);
+                    this.Size = new Size(1300, 780);
+                    this.FormBorderStyle = FormBorderStyle.Sizable;
+                    this.MaximizeBox = true;
+                    // 必须重置窗口位置居中
+                    this.CenterToScreen();
+
+                    // 根据所处的 Tab 将执行列表放回设计器或者小助手
+                    if (_flowContainer != null && _innerSplit != null)
+                    {
+                        _flowContainer.Controls.Add(_innerSplit);
+                    }
                 }
-            }
-            else
-            {
-                _pnlStudioRoot.Visible = false;
-                _pnlAssistantRoot.Visible = true;
+                else
+                {
+                    this.Size = new Size(420, 760);
+                    this.FormBorderStyle = FormBorderStyle.FixedDialog;
+                    this.MaximizeBox = false;
+                    this.CenterToScreen();
+                    
+                    if (_pnlAssistantBody != null && _innerSplit != null)
+                    {
+                        _pnlAssistantBody.Controls.Add(_innerSplit);
+                    }
+                }
+            };
+
+            // 软件启动时，进入小助手模式
+            this.Load += (_, __) => {
+                mainTabs.SelectedIndex = 0;
                 this.Size = new Size(420, 760);
                 this.FormBorderStyle = FormBorderStyle.FixedDialog;
                 this.MaximizeBox = false;
                 this.CenterToScreen();
-
+                
                 if (_pnlAssistantBody != null && _innerSplit != null)
                 {
                     _pnlAssistantBody.Controls.Add(_innerSplit);
                 }
-            }
+            };
         }
 
         // =====================================================
