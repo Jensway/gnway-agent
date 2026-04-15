@@ -26,11 +26,11 @@ namespace GnwayController
     public class MainForm : Form
     {
         // ── 设计令牌 ──────────────────────────────────────────
-        static readonly Font F_BODY  = new Font("Segoe UI", 9f);
-        static readonly Font F_SMALL = new Font("Segoe UI", 8.5f);
-        static readonly Font F_BOLD  = new Font("Segoe UI", 9f, FontStyle.Bold);
+        static readonly Font F_BODY  = new Font("Microsoft YaHei", 9f);
+        static readonly Font F_SMALL = new Font("Microsoft YaHei", 8.5f);
+        static readonly Font F_BOLD  = new Font("Microsoft YaHei", 9f, FontStyle.Bold);
         static readonly Font F_LOG   = new Font("Consolas",  9f);
-        static readonly Font F_TITLE = new Font("Segoe UI", 10f, FontStyle.Bold);
+        static readonly Font F_TITLE = new Font("Microsoft YaHei", 10f, FontStyle.Bold);
         static readonly Font F_MONO  = new Font("Consolas",  8.5f);
 
         static readonly Color C_BG      = Color.FromArgb(242, 245, 250);
@@ -160,10 +160,10 @@ namespace GnwayController
             int x = 10;
             toolbar.Controls.Add(Lbl("服务器 IP", toolbar, new Point(x, 8)));
             _tbServer = new TextBox {
-                Text = ".", Width = 130, Location = new Point(x, 26),
+                Text = "192.168.0.80", Width = 130, Location = new Point(x, 26),
                 Font = F_BODY, BorderStyle = BorderStyle.FixedSingle
             };
-            toolbar.Controls.Add(_tbServer); x += 142;
+            toolbar.Controls.Add(_tbServer); x += 140;
 
             _btnTest = Btn("连接测试", toolbar, new Point(x, 24), 80, C_ACCENT, Color.White);
             _btnTest.Click += OnTestConnect; x += 90;
@@ -172,18 +172,19 @@ namespace GnwayController
                 Location = new Point(x, 29), AutoSize = true,
                 ForeColor = C_SUB, Font = F_SMALL, BackColor = Color.Transparent
             };
-            toolbar.Controls.Add(_lblConn); x += 145;
+            
+            toolbar.Controls.Add(_lblConn); x += 105;
 
             _btnRefreshWins = Btn("🔄 获取全部窗口", toolbar, new Point(x, 24), 110, C_BG, C_TEXT);
             _btnRefreshWins.Click += OnGetWindows;
             toolbar.Controls.Add(_btnRefreshWins); x += 120;
 
             // ── 根布局双模容器 (TabControl) ──────────────────────────
-            var mainTabs = new TabControl { Dock = DockStyle.Fill, Font = new Font("Segoe UI", 9.5f) };
+            var mainTabs = new TabControl { Dock = DockStyle.Fill, Font = new Font("Microsoft YaHei", 9f) };
             Controls.Add(mainTabs);
 
             var tabAssistant = new TabPage("执行助手");
-            var tabStudio = new TabPage("开发设计工作台");
+            var tabStudio = new TabPage("设计平台");
 
             mainTabs.TabPages.Add(tabAssistant);
             mainTabs.TabPages.Add(tabStudio);
@@ -492,31 +493,32 @@ namespace GnwayController
             var execBar = new Panel { Dock = DockStyle.Top, Height = 40, BackColor = C_CARD };
             _innerSplit.Panel2.Controls.Add(execBar);
 
-            execBar.Controls.Add(Lbl("从第", execBar, new Point(6, 10)));
+            execBar.Controls.Add(Lbl("从第", execBar, new Point(10, 10)));
             _nudStart = new NumericUpDown {
                 Minimum = 1, Maximum = 999, Value = 1,
-                Location = new Point(36, 7), Width = 52, Font = F_BODY
+                Location = new Point(48, 7), Width = 52, Font = F_BODY
             };
             execBar.Controls.Add(_nudStart);
-            execBar.Controls.Add(Lbl("步", execBar, new Point(92, 10)));
+            execBar.Controls.Add(Lbl("步", execBar, new Point(106, 10)));
 
-            execBar.Controls.Add(Lbl("超时", execBar, new Point(108, 10)));
+            execBar.Controls.Add(Lbl("超时", execBar, new Point(132, 10)));
             _nudTimeout = new NumericUpDown {
                 Minimum = 5, Maximum = 300, Value = 60,
-                Location = new Point(138, 7), Width = 56, Font = F_BODY
+                Location = new Point(168, 7), Width = 56, Font = F_BODY
             };
             execBar.Controls.Add(_nudTimeout);
-            execBar.Controls.Add(Lbl("秒", execBar, new Point(198, 10)));
+            execBar.Controls.Add(Lbl("秒", execBar, new Point(230, 10)));
 
-            int ex = 216;
-            _btnStart = Btn("▶ 启动", execBar, new Point(ex, 6), 72, Color.FromArgb(22, 101, 52), Color.White); ex += 78;
+            int ex = 260;
+            _btnStart = Btn("▶ 启动", execBar, new Point(ex, 5), 74, Color.FromArgb(22, 101, 52), Color.White); ex += 84;
             _btnStart.Click += OnStart;
-            _btnPause = Btn("⏸ 暂停", execBar, new Point(ex, 6), 72, Color.FromArgb(120, 53, 15), Color.White); ex += 78;
+            _btnPause = Btn("⏸ 暂停", execBar, new Point(ex, 5), 74, C_BG, C_TEXT); ex += 84;
             _btnPause.Enabled = false;
             _btnPause.Click   += OnPause;
-            _btnStop  = Btn("⏹ 停止", execBar, new Point(ex, 6), 72, Color.FromArgb(153, 27, 27), Color.White);
+            _btnStop  = Btn("⏹ 停止", execBar, new Point(ex, 5), 74, C_BG, C_TEXT);
             _btnStop.Enabled = false;
             _btnStop.Click   += OnStop;
+
 
             _rtLog = new RichTextBox {
                 Dock = DockStyle.Fill,
@@ -1286,12 +1288,13 @@ namespace GnwayController
 
         private static Panel SectionHeader(string title, Control parent, DockStyle dock)
         {
-            var hdr = new Panel { Dock = dock, Height = 30, BackColor = Color.FromArgb(37, 99, 185) };
+            var hdr = new Panel { Dock = dock, Height = 32, BackColor = Color.FromArgb(246, 248, 252) };
+            hdr.Paint += (s, e) => e.Graphics.DrawLine(new Pen(C_BORDER), 0, hdr.Height - 1, hdr.Width, hdr.Height - 1);
             var lbl = new Label {
                 Text = title, Dock = DockStyle.Fill,
-                Font = F_BOLD, ForeColor = Color.White,
+                Font = F_BOLD, ForeColor = C_TEXT,
                 TextAlign = ContentAlignment.MiddleLeft, BackColor = Color.Transparent,
-                Padding = new Padding(8, 0, 0, 0)
+                Padding = new Padding(2, 0, 0, 0)
             };
             hdr.Controls.Add(lbl);
             parent.Controls.Add(hdr);
