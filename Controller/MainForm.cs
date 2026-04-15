@@ -155,8 +155,7 @@ namespace GnwayController
             };
             toolbar.Paint += (s, e) =>
                 e.Graphics.DrawLine(new Pen(C_BORDER), 0, toolbar.Height - 1, toolbar.Width, toolbar.Height - 1);
-            // 将配置类工具栏直接装入设计器面板中，小助手模式不显示
-            Controls.Add(toolbar);
+            // 待会在下方装配到 _pnlStudioRoot
 
             int x = 10;
             toolbar.Controls.Add(Lbl("服务器 IP", toolbar, new Point(x, 8)));
@@ -179,20 +178,86 @@ namespace GnwayController
             _btnRefreshWins.Click += OnGetWindows;
             toolbar.Controls.Add(_btnRefreshWins); x += 120;
 
-            // ── 主体 SplitContainer ──────────────────────────
+            // ── 根布局双模容器 ────────────────────────────────────────
+            _pnlAssistantRoot = new Panel { Dock = DockStyle.Fill, Visible = true, BackColor = C_BG };
+            _pnlStudioRoot = new Panel { Dock = DockStyle.Fill, Visible = false, BackColor = C_BG };
+            
+            Controls.Add(_pnlAssistantRoot);
+            Controls.Add(_pnlStudioRoot);
+            
+            _pnlStudioRoot.Controls.Add(toolbar);
+            _pnlStudioRoot.Controls.SetChildIndex(toolbar, 0);
+
+            // 【模式】设计器模式内容 (挂载原逻辑)
             var split = new SplitContainer {
-                Dock = DockStyle.Fill,
-                SplitterWidth = 5,
-                BackColor = C_BG,
-                Orientation = Orientation.Vertical,
-                Panel1MinSize = 280
+                Dock = DockStyle.Fill, SplitterWidth = 5, BackColor = C_BG, Orientation = Orientation.Vertical, Panel1MinSize = 280
             };
-            Controls.Add(split);
-            split.BringToFront(); // [!!! FIX MANGLED FORM LAYOUT OVERLAP !!!]
+            
+            // 为设计器模式添加一个顶部工具栏（返回小助手用）
+            var studioNav = new Panel { Dock = DockStyle.Top, Height = 45, BackColor = C_HDR_BG };
+            var btnGoAsst = Btn("← 退出设计器，返回执行助手", studioNav, new Point(12, 8), 240, Color.FromArgb(50, 255, 255, 255), Color.White);
+            btnGoAsst.Click += (_, __) => SwitchMode(false);
+            
+            _pnlStudioRoot.Controls.Add(split);
+            _pnlStudioRoot.Controls.Add(studioNav);
+            split.BringToFront(); // 修复叠加问题
+            
             this.Load += (_, __) => split.SplitterDistance = (int)(ClientSize.Width * 0.55);
 
             BuildLeftPanel(split.Panel1);
             BuildRightPanel(split.Panel2);
+
+            // 【模式】小助手模式内容
+            var asstTop = new Panel { Dock = DockStyle.Top, Height = 64, BackColor = C_HDR_BG };
+            _pnlAssistantRoot.Controls.Add(asstTop);
+            
+            var asstTitle = new Label { Text = "GnwayAgent 执行助手", ForeColor = Color.White, Font = new Font("Segoe UI", 12f, FontStyle.Bold), Location = new Point(16, 20), AutoSize = true };
+            asstTop.Controls.Add(asstTitle);
+
+            var btnGoStudio = Btn("⚙️ 开发设计模式", asstTop, new Point(10, 16), 120, Color.FromArgb(50, 255, 255, 255), Color.White);
+            asstTop.Resize += (s, e) => btnGoStudio.Left = asstTop.Width - 140;
+            btnGoStudio.Click += (_, __) => SwitchMode(true);
+            asstTop.Controls.Add(btnGoStudio);
+
+            _pnlAssistantBody = new Panel { Dock = DockStyle.Fill, BackColor = Color.White, Padding = new Padding(12) };
+            _pnlAssistantRoot.Controls.Add(_pnlAssistantBody);
+            _pnlAssistantBody.BringToFront();
+
+            // 软件启动时，进入小助手模式
+            this.Load += (_, __) => SwitchMode(false);
+        }
+
+        private void SwitchMode(bool toStudio)
+        {
+            _isStudioMode = toStudio;
+            if (toStudio)
+            {
+                _pnlAssistantRoot.Visible = false;
+                _pnlStudioRoot.Visible = true;
+                this.Size = new Size(1300, 780);
+                this.FormBorderStyle = FormBorderStyle.Sizable;
+                this.MaximizeBox = true;
+                this.CenterToScreen();
+
+                if (_flowContainer != null && _innerSplit != null)
+                {
+                    _flowContainer.Controls.Add(_innerSplit);
+                }
+            }
+            else
+            {
+                _pnlStudioRoot.Visible = false;
+                _pnlAssistantRoot.Visible = true;
+                this.Size = new Size(420, 760);
+                this.FormBorderStyle = FormBorderStyle.FixedDialog;
+                this.MaximizeBox = false;
+                this.CenterToScreen();
+
+                if (_pnlAssistantBody != null && _innerSplit != null)
+                {
+                    _pnlAssistantBody.Controls.Add(_innerSplit);
+                }
+            }
         }
 
         // =====================================================
@@ -327,7 +392,9 @@ namespace GnwayController
             this.Load += (_, __) => rightSplit.SplitterDistance = 240;
 
             BuildEventsPanel(rightSplit.Panel1);
-            BuildFlowPanel(rightSplit.Panel2);
+            _flowContainer = new Panel { Dock = DockStyle.Fill };
+            rightSplit.Panel2.Controls.Add(_flowContainer);
+            BuildFlowPanel(_flowContainer);
         }
 
         // ── 右上：已录制事件 ──────────────────────────────────
@@ -370,7 +437,7 @@ namespace GnwayController
         }
 
         // ── 右下：流程步骤 + 执行控制 + 日志 ─────────────────
-        private void BuildFlowPanel(SplitterPanel panel)
+        private void BuildFlowPanel(Control panel)
         {
             _innerSplit = new SplitContainer {
                 Dock = DockStyle.Fill,
@@ -381,7 +448,7 @@ namespace GnwayController
             };
             panel.Controls.Add(_innerSplit);
             this.Load += (_, __) => {
-                _innerSplit.SplitterDistance = (int)(_innerSplit.Height * 0.55);
+                try { _innerSplit.SplitterDistance = (int)(_innerSplit.Height * 0.55); } catch { }
             };
 
             // ── 上半：流程步骤列表 ────────────────────────────
