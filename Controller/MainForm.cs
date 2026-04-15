@@ -202,7 +202,7 @@ namespace GnwayController
             _pnlStudioRoot.Controls.Add(studioNav);
             split.BringToFront(); // 修复叠加问题
             
-            this.Load += (_, __) => split.SplitterDistance = (int)(ClientSize.Width * 0.55);
+            this.Load += (_, __) => { try { split.SplitterDistance = (int)(ClientSize.Width * 0.55); } catch { } };
 
             BuildLeftPanel(split.Panel1);
             BuildRightPanel(split.Panel2);
@@ -271,7 +271,7 @@ namespace GnwayController
             };
             panel.Controls.Add(splitLeft);
             splitLeft.BringToFront();
-            this.Load += (_, __) => splitLeft.SplitterDistance = 240;
+            this.Load += (_, __) => { try { splitLeft.SplitterDistance = 240; } catch { } };
 
             // --- 上半部：主表（窗口列表） ---
             SectionHeader("在线窗口 (Master)", splitLeft.Panel1, DockStyle.Top);
@@ -389,7 +389,7 @@ namespace GnwayController
                 Panel1MinSize = 140
             };
             panel.Controls.Add(rightSplit);
-            this.Load += (_, __) => rightSplit.SplitterDistance = 240;
+            this.Load += (_, __) => { try { rightSplit.SplitterDistance = 240; } catch { } };
 
             BuildEventsPanel(rightSplit.Panel1);
             _flowContainer = new Panel { Dock = DockStyle.Fill };
