@@ -86,11 +86,6 @@ namespace GnwayController
         SplitContainer _innerSplit = null!;
 
         // ── 双模状态 ────────────────────────────────────────
-        bool _isStudioMode = false;
-        Panel _pnlAssistantRoot = null!;
-        Panel _pnlStudioRoot = null!;
-        Panel _pnlAssistantBody = null!;
-        Panel _flowContainer = null!;
 
         // ── 状态 ──────────────────────────────────────────────
         EventStore         _store     = null!;
@@ -140,8 +135,8 @@ namespace GnwayController
         private void InitUI()
         {
             Text          = "GnwayAgent · 自动化录制执行平台";
-            Size          = new Size(1240, 740);
-            MinimumSize   = new Size(960, 600);
+            Size          = new Size(1000, 740);
+            MinimumSize   = new Size(500, 600);
             StartPosition = FormStartPosition.CenterScreen;
             BackColor     = C_BG;
             Font          = F_BODY;
@@ -183,90 +178,43 @@ namespace GnwayController
             var mainTabs = new TabControl { Dock = DockStyle.Fill, Font = new Font("Microsoft YaHei", 9f) };
             Controls.Add(mainTabs);
 
-            var tabAssistant = new TabPage("执行助手");
-            var tabStudio = new TabPage("设计平台");
+            var tabAssistant = new TabPage("执行助手") { BackColor = C_BG };
+            var tabStudio = new TabPage("设计平台") { BackColor = C_BG };
 
             mainTabs.TabPages.Add(tabAssistant);
             mainTabs.TabPages.Add(tabStudio);
-
-            _pnlAssistantRoot = new Panel { Dock = DockStyle.Fill, Visible = true, BackColor = Color.White };
-            _pnlStudioRoot = new Panel { Dock = DockStyle.Fill, Visible = true, BackColor = C_BG };
             
-            tabAssistant.Controls.Add(_pnlAssistantRoot);
-            tabStudio.Controls.Add(_pnlStudioRoot);
+            tabStudio.Controls.Add(toolbar);
+            tabStudio.Controls.SetChildIndex(toolbar, 0);
+
+            // 【模式】设计平台（Studio）内容
+            var pnlStudioBody = new Panel { Dock = DockStyle.Fill };
+            tabStudio.Controls.Add(pnlStudioBody);
+            pnlStudioBody.BringToFront();
+            BuildStudioPanel(pnlStudioBody);
+
+            // 【模式】执行助手（Assistant）内容
+            var pnlAssistantBody = new Panel { Dock = DockStyle.Fill, BackColor = Color.White, Padding = new Padding(12) };
+            tabAssistant.Controls.Add(pnlAssistantBody);
+            pnlAssistantBody.BringToFront();
             
-            _pnlStudioRoot.Controls.Add(toolbar);
-            _pnlStudioRoot.Controls.SetChildIndex(toolbar, 0);
-
-            // 【模式】设计器模式内容
-            var split = new SplitContainer {
-                Dock = DockStyle.Fill, SplitterWidth = 5, BackColor = C_BG, Orientation = Orientation.Vertical, Panel1MinSize = 280
-            };
+            var assistantContainer = new Panel { Dock = DockStyle.Fill };
+            pnlAssistantBody.Controls.Add(assistantContainer);
+            BuildFlowPanel(assistantContainer);
             
-            _pnlStudioRoot.Controls.Add(split);
-            split.BringToFront(); // 修复叠加问题
-            
-            this.Load += (_, __) => { try { split.SplitterDistance = (int)(ClientSize.Width * 0.55); } catch { } };
-
-            BuildLeftPanel(split.Panel1);
-            BuildRightPanel(split.Panel2);
-
-            // 【模式】小助手模式内容
-            _pnlAssistantBody = new Panel { Dock = DockStyle.Fill, BackColor = Color.White, Padding = new Padding(12) };
-            _pnlAssistantRoot.Controls.Add(_pnlAssistantBody);
-            _pnlAssistantBody.BringToFront();
-
-            // 监听标签页切换，动态调整窗口和流程模块位置
-            mainTabs.SelectedIndexChanged += (s, e) => {
-                bool toStudio = (mainTabs.SelectedIndex == 1);
-                _isStudioMode = toStudio;
-                if (toStudio)
-                {
-                    this.Size = new Size(1300, 780);
-                    this.FormBorderStyle = FormBorderStyle.Sizable;
-                    this.MaximizeBox = true;
-                    // 必须重置窗口位置居中
-                    this.CenterToScreen();
-
-                    // 根据所处的 Tab 将执行列表放回设计器或者小助手
-                    if (_flowContainer != null && _innerSplit != null)
-                    {
-                        _flowContainer.Controls.Add(_innerSplit);
-                    }
-                }
-                else
-                {
-                    this.Size = new Size(420, 760);
-                    this.FormBorderStyle = FormBorderStyle.FixedDialog;
-                    this.MaximizeBox = false;
-                    this.CenterToScreen();
-                    
-                    if (_pnlAssistantBody != null && _innerSplit != null)
-                    {
-                        _pnlAssistantBody.Controls.Add(_innerSplit);
-                    }
-                }
-            };
-
-            // 软件启动时，进入小助手模式
             this.Load += (_, __) => {
                 mainTabs.SelectedIndex = 0;
-                this.Size = new Size(420, 760);
-                this.FormBorderStyle = FormBorderStyle.FixedDialog;
-                this.MaximizeBox = false;
-                this.CenterToScreen();
-                
-                if (_pnlAssistantBody != null && _innerSplit != null)
-                {
-                    _pnlAssistantBody.Controls.Add(_innerSplit);
-                }
             };
         }
 
-        // =====================================================
+// =====================================================
         //  左区：Master-Detail 布局
         // =====================================================
-        private void BuildLeftPanel(SplitterPanel panel)
+        
+        // =====================================================
+        //  设计平台：窗口与操作 (Unified Layout)
+        // =====================================================
+        private void BuildStudioPanel(Control panel)
         {
             var splitLeft = new SplitContainer {
                 Dock = DockStyle.Fill, Orientation = Orientation.Horizontal,
@@ -274,7 +222,7 @@ namespace GnwayController
             };
             panel.Controls.Add(splitLeft);
             splitLeft.BringToFront();
-            this.Load += (_, __) => { try { splitLeft.SplitterDistance = 240; } catch { } };
+            this.Load += (_, __) => { try { splitLeft.SplitterDistance = 300; } catch { } };
 
             // --- 上半部：主表（窗口列表） ---
             SectionHeader("在线窗口 (Master)", splitLeft.Panel1, DockStyle.Top);
@@ -289,9 +237,28 @@ namespace GnwayController
             splitLeft.Panel1.Controls.Add(_dgvWindows);
             _dgvWindows.BringToFront();
 
-            // --- 下半部：明细表（控件与动作组合） ---
-            SectionHeader("窗口控件与内联动作 (Detail)", splitLeft.Panel2, DockStyle.Top);
+            // --- 下半部：Tabs（控件与内联动作 / 已录制事件） ---
+            var detailsTabs = new TabControl { Dock = DockStyle.Fill, Font = F_BODY };
+            splitLeft.Panel2.Controls.Add(detailsTabs);
             
+            var tpControls = new TabPage("窗口控件与内联动作") { BackColor = C_BG };
+            var tpEvents = new TabPage("已录制事件") { BackColor = C_BG };
+            detailsTabs.TabPages.Add(tpControls);
+            detailsTabs.TabPages.Add(tpEvents);
+            
+            // --- 组装 Tab 1: 控件树 ---
+            var pnlControls = new Panel { Dock = DockStyle.Fill };
+            tpControls.Controls.Add(pnlControls);
+            BuildControlsGrid(pnlControls);
+            
+            // --- 组装 Tab 2: 已录制事件 ---
+            var pnlEvents = new Panel { Dock = DockStyle.Fill };
+            tpEvents.Controls.Add(pnlEvents);
+            BuildEventsGrid(pnlEvents);
+        }
+
+        private void BuildControlsGrid(Control panel)
+        {
             _dgvTree = new DataGridView {
                 Dock = DockStyle.Fill,
                 RowHeadersVisible = false, AllowUserToAddRows = false, AllowUserToDeleteRows = false,
@@ -313,10 +280,10 @@ namespace GnwayController
             _dgvTree.DefaultCellStyle.SelectionBackColor = Color.FromArgb(229, 243, 255);
             _dgvTree.DefaultCellStyle.SelectionForeColor = C_TEXT;
 
-            _dgvTree.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "类型", Name = "colType", Width = 140, MinimumWidth = 40, Resizable = DataGridViewTriState.True, AutoSizeMode = DataGridViewAutoSizeColumnMode.None, ReadOnly = true, SortMode = DataGridViewColumnSortMode.NotSortable, Frozen = true });
-            _dgvTree.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "标识码", Name = "colMagicId", Width = 200, MinimumWidth = 60, Resizable = DataGridViewTriState.True, AutoSizeMode = DataGridViewAutoSizeColumnMode.None, ReadOnly = true, SortMode = DataGridViewColumnSortMode.NotSortable, Frozen = true });
-            _dgvTree.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "标题文字", Name = "colText", Width = 200, MinimumWidth = 60, Resizable = DataGridViewTriState.True, AutoSizeMode = DataGridViewAutoSizeColumnMode.None, ReadOnly = true, SortMode = DataGridViewColumnSortMode.NotSortable });
-            _dgvTree.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "坐标矩形", Name = "colRect", Width = 160, MinimumWidth = 40, Resizable = DataGridViewTriState.True, AutoSizeMode = DataGridViewAutoSizeColumnMode.None, ReadOnly = true, SortMode = DataGridViewColumnSortMode.NotSortable });
+            _dgvTree.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "类型", Name = "colType", Width = 110, MinimumWidth = 40, Resizable = DataGridViewTriState.True, AutoSizeMode = DataGridViewAutoSizeColumnMode.None, ReadOnly = true, SortMode = DataGridViewColumnSortMode.NotSortable, Frozen = true });
+            _dgvTree.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "标识码", Name = "colMagicId", Width = 180, MinimumWidth = 60, Resizable = DataGridViewTriState.True, AutoSizeMode = DataGridViewAutoSizeColumnMode.None, ReadOnly = true, SortMode = DataGridViewColumnSortMode.NotSortable, Frozen = true });
+            _dgvTree.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "标题文字", Name = "colText", Width = 180, MinimumWidth = 60, Resizable = DataGridViewTriState.True, AutoSizeMode = DataGridViewAutoSizeColumnMode.None, ReadOnly = true, SortMode = DataGridViewColumnSortMode.NotSortable });
+            _dgvTree.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "坐标矩形", Name = "colRect", Width = 140, MinimumWidth = 40, Resizable = DataGridViewTriState.True, AutoSizeMode = DataGridViewAutoSizeColumnMode.None, ReadOnly = true, SortMode = DataGridViewColumnSortMode.NotSortable });
             _dgvTree.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "状态", Name = "colEnabled", Width = 40, MinimumWidth = 30, Resizable = DataGridViewTriState.True, AutoSizeMode = DataGridViewAutoSizeColumnMode.None, ReadOnly = true, SortMode = DataGridViewColumnSortMode.NotSortable });
             
             var colAct = new DataGridViewComboBoxColumn { HeaderText = "操作", Name = "colAction", Width = 85, DisplayStyle = DataGridViewComboBoxDisplayStyle.ComboBox, SortMode = DataGridViewColumnSortMode.NotSortable };
@@ -324,7 +291,7 @@ namespace GnwayController
             colAct.DefaultCellStyle.BackColor = Color.FromArgb(245, 245, 245);
             _dgvTree.Columns.Add(colAct);
 
-            var colVal = new DataGridViewTextBoxColumn { HeaderText = "测试值", Name = "colValue", Width = 140, SortMode = DataGridViewColumnSortMode.NotSortable };
+            var colVal = new DataGridViewTextBoxColumn { HeaderText = "测试值", Name = "colValue", Width = 100, SortMode = DataGridViewColumnSortMode.NotSortable };
             colVal.DefaultCellStyle.BackColor = Color.LightYellow;
             _dgvTree.Columns.Add(colVal);
 
@@ -333,12 +300,12 @@ namespace GnwayController
 
             _dgvTree.CellContentClick += OnTreeActionClick;
             _dgvTree.CellFormatting   += OnTreeCellFormat;
-            splitLeft.Panel2.Controls.Add(_dgvTree);
+            panel.Controls.Add(_dgvTree);
 
-            // 底部：状态 + 测试输出 (附着在 Panel2)
+            // 底部：状态 + 测试输出
             var bottom = new Panel { Dock = DockStyle.Bottom, Height = 155, BackColor = C_CARD };
             bottom.Paint += (s, e) => e.Graphics.DrawLine(new Pen(C_BORDER), 0, 0, bottom.Width, 0);
-            splitLeft.Panel2.Controls.Add(bottom);
+            panel.Controls.Add(bottom);
 
             _lblTreeSt = new Label {
                 Text = "控件树空——请先点击上方任一在线窗口",
@@ -379,32 +346,8 @@ namespace GnwayController
             _dgvTree.BringToFront(); // 让 Tree 占用剩余空间
         }
 
-        // =====================================================
-        //  右区：事件列表 + 流程步骤 + 执行日志
-        // =====================================================
-        private void BuildRightPanel(SplitterPanel panel)
+        private void BuildEventsGrid(Control panel)
         {
-            var rightSplit = new SplitContainer {
-                Dock = DockStyle.Fill,
-                Orientation = Orientation.Horizontal,
-                SplitterWidth = 5,
-                BackColor = C_BG,
-                Panel1MinSize = 140
-            };
-            panel.Controls.Add(rightSplit);
-            this.Load += (_, __) => { try { rightSplit.SplitterDistance = 240; } catch { } };
-
-            BuildEventsPanel(rightSplit.Panel1);
-            _flowContainer = new Panel { Dock = DockStyle.Fill };
-            rightSplit.Panel2.Controls.Add(_flowContainer);
-            BuildFlowPanel(_flowContainer);
-        }
-
-        // ── 右上：已录制事件 ──────────────────────────────────
-        private void BuildEventsPanel(SplitterPanel panel)
-        {
-            SectionHeader("已录制的事件", panel, DockStyle.Top);
-
             // 按钮条
             var btnBar = new Panel { Dock = DockStyle.Top, Height = 32, BackColor = C_CARD };
             panel.Controls.Add(btnBar);
@@ -436,11 +379,11 @@ namespace GnwayController
             _lvEvents.Columns.Add("动作", 250);
             _lvEvents.KeyDown += OnListViewCopy;
             panel.Controls.Add(_lvEvents);
-            _lvEvents.BringToFront(); // [!!! FIX MANGLED RIGHT-TOP PANEL (EVENTS LIST) OVERLAP !!!]
+            _lvEvents.BringToFront();
         }
 
-        // ── 右下：流程步骤 + 执行控制 + 日志 ─────────────────
-        private void BuildFlowPanel(Control panel)
+
+private void BuildFlowPanel(Control panel)
         {
             _innerSplit = new SplitContainer {
                 Dock = DockStyle.Fill,

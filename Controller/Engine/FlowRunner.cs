@@ -368,7 +368,7 @@ namespace GnwayController.Engine
             if (selectedIdx >= 0 && hitIndices.Contains(selectedIdx))
             {
                 targetIdx = selectedIdx;
-                Log($"  → 当前第{targetIdx}行已选中且含\"{a.MatchText}\"，直接处理，跳过选中步骤", LogLevel.Ok);
+                Log($"  → 当前第{targetIdx}行已选中且含\"{a.MatchText}\"，直接锁定当前行动作", LogLevel.Ok);
             }
             else
             {
@@ -384,12 +384,14 @@ namespace GnwayController.Engine
                     // 如果选中行之后没有了，就回到顶部找第一个
                     targetIdx = hitIndices[0];
                 }
-
-                string selResult = _client.Send(
-                    $"gridselect|{evt.WindowName}|{a.ControlName}|{targetIdx}");
-                Log($"  → 选行 [{a.ControlName}] 第{targetIdx}行（含\"{a.MatchText}\"）：{OkOrErr(selResult)}",
-                    selResult.StartsWith("OK") ? LogLevel.Ok : LogLevel.Warn);
             }
+
+            // [重要修正] 必须无论如何都在这里触发一次强制选中事件，
+            // 防范由于底层软件状态重绘导致的假选中（看似有底色实则无 Detail Panel 加载）
+            string selResult = _client.Send(
+                $"gridselect|{evt.WindowName}|{a.ControlName}|{targetIdx}");
+            Log($"  → 强制触发选中 [{a.ControlName}] 第{targetIdx}行（含\"{a.MatchText}\"）：{OkOrErr(selResult)}",
+                selResult.StartsWith("OK") ? LogLevel.Ok : LogLevel.Warn);
 
             return false;
         }
