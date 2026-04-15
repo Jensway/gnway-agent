@@ -362,6 +362,14 @@ namespace GnwayController.Engine
                 return true; // 通知 RunLoop 流程完成
             }
 
+            Log($"  📊 [智能眼] 表格总揽：共扫描到 {lines.Length} 行数据，其中 {hitIndices.Count} 行状态包含「{a.MatchText}」(需处理)。", LogLevel.Info);
+            if(selectedIdx >= 0) {
+                bool selIsPending = hitIndices.Contains(selectedIdx);
+                Log($"  👁 [智能眼] 检测到当前正处于第 {selectedIdx} 行，该行状态: {(selIsPending ? "【待处理】" : "【无需处理/已完成】")}", LogLevel.Info);
+            } else {
+                Log($"  👁 [智能眼] 当前表格没有明确的高亮选中行，将从上到下按顺序检索", LogLevel.Info);
+            }
+
             int targetIdx = -1;
 
             // 优先检查当前选中行是否待处理
