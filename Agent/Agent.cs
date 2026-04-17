@@ -802,7 +802,28 @@ namespace GnwayAgent
                     {
                         if (child.TryGetCurrentPattern(SelectionItemPattern.Pattern, out object? sp))
                         {
-                            ((SelectionItemPattern)sp).Select();
+                            var sitem = (SelectionItemPattern)sp;
+                            bool alreadySelected = false;
+                            try { alreadySelected = sitem.Current.IsSelected; } catch { }
+
+                            sitem.Select();
+
+                            // [核心修复] 如果行早就是选中状态（比如软件刚打开默认锁定第一行），此时 Select() 会被忽略，
+                            // 导致右侧没有加载这行的数据（伪选中状态）。必须强行物理点击一下来激活它。
+                            if (alreadySelected)
+                            {
+                                child.SetFocus();
+                                var rect = child.Current.BoundingRectangle;
+                                ShowClickHighlight(new System.Drawing.Rectangle((int)rect.Left, (int)rect.Top, (int)rect.Width, (int)rect.Height));
+
+                                var pt = new System.Drawing.Point((int)(rect.Left + 10), (int)(rect.Top + rect.Height / 2));
+                                System.Windows.Forms.Cursor.Position = pt;
+                                Thread.Sleep(60);
+                                mouse_event(MOUSEEVENTF_LEFTDOWN, pt.X, pt.Y, 0, 0);
+                                Thread.Sleep(50);
+                                mouse_event(MOUSEEVENTF_LEFTUP, pt.X, pt.Y, 0, 0);
+                                Thread.Sleep(100); // 彻底留够时间让右侧刷新
+                            }
                         }
                         else
                         {
