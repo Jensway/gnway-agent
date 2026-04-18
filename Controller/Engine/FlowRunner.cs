@@ -343,12 +343,17 @@ namespace GnwayController.Engine
                 bool isSelected = parts.Length > 0 && parts[0] == "[SELECTED]";
                 string rowData = parts.Length > 1 ? parts[1] : lines[i];
 
-                if (isSelected) selectedIdx = i;
+                // 核心修复：防范多选或伪多选状态，只认第一个被选中的行
+                if (isSelected && selectedIdx < 0) 
+                {
+                    selectedIdx = i;
+                }
 
                 var cols = rowData.Split('\t');
                 bool hit = a.ColIndex < cols.Length
                     ? cols[a.ColIndex].Contains(a.MatchText)
                     : rowData.Contains(a.MatchText);
+
                 
                 if (hit)
                 {
@@ -372,25 +377,26 @@ namespace GnwayController.Engine
 
             int targetIdx = -1;
 
-            // 优先检查当前选中行是否待处理
+            // 第一道防线：优先检查当前真实处于焦点/选中的行是否待处理
             if (selectedIdx >= 0 && hitIndices.Contains(selectedIdx))
             {
                 targetIdx = selectedIdx;
-                Log($"  → 当前第{targetIdx}行已选中且含\"{a.MatchText}\"，直接锁定当前行动作", LogLevel.Ok);
+                Log($"  → 当前第 {targetIdx} 行已选中且含\"{a.MatchText}\"，直接锁定当前行动作", LogLevel.Ok);
             }
             else
             {
-                // 若当前行不是待处理，或者未识别到选中行，则尝试寻找选中行之后的待处理行
-                targetIdx = hitIndices.FirstOrDefault(idx => idx > selectedIdx);
-                if (targetIdx == 0 && !hitIndices.Contains(0) && selectedIdx < 0) 
+                // 第二道防线：如果在当前选中行之后能找到符合条件的下一行
+                var nextIndices = hitIndices.Where(idx => idx > selectedIdx).ToList();
+                if (nextIndices.Any())
                 {
-                    // Fallback
-                    targetIdx = hitIndices[0]; 
+                    targetIdx = nextIndices.First();
+                    Log($"  → 越过已处理数据，锁定后续第 {targetIdx} 行为目标", LogLevel.Info);
                 }
-                else if (targetIdx <= 0 && selectedIdx >= 0) 
+                else if (hitIndices.Any())
                 {
-                    // 如果选中行之后没有了，就回到顶部找第一个
-                    targetIdx = hitIndices[0];
+                    // 第三道防线：兜底锁定最顶部的第一个（通常发生在循环重置时）
+                    targetIdx = hitIndices.First();
+                    Log($"  → 回到列表顶部，锁定第 {targetIdx} 行为目标", LogLevel.Info);
                 }
             }
 

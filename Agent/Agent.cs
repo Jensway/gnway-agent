@@ -796,7 +796,8 @@ namespace GnwayAgent
             while (child != null)
             {
                 var ct = child.Current.ControlType;
-                if (ct == ControlType.DataItem || ct == ControlType.ListItem || ct == ControlType.Custom)
+                // [核心修复] 遍历条件必须和 DoGridRows 完全保持一致，否则两边的索引会错位导致跳过行
+                if (ct == ControlType.DataItem || ct == ControlType.ListItem || ct == ControlType.TreeItem || ct == ControlType.Custom)
                 {
                     if (current == rowIndex)
                     {
