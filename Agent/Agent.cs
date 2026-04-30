@@ -760,23 +760,25 @@ namespace GnwayAgent
                             isSelected = ((SelectionItemPattern)sp).Current.IsSelected;
                         } else {
                             try {
-                                // 尝试通过底层 Win32/MSAA 提取 State 状态
                                 Guid iidAcc = new Guid("618736E0-3C3D-11CF-810C-00AA00389B71");
-                                if (AccessibleObjectFromWindow((IntPtr)child.Current.NativeWindowHandle, 0xFFFFFFFC, ref iidAcc, out object accObj) == 0 && accObj is Accessibility.IAccessible acc) {
+                                IntPtr rowHwnd = (IntPtr)child.Current.NativeWindowHandle;
+                                if (rowHwnd != IntPtr.Zero &&
+                                    AccessibleObjectFromWindow(rowHwnd, OBJID_CLIENT, ref iidAcc, out object accObj) == 0 &&
+                                    accObj is Accessibility.IAccessible acc)
+                                {
                                     object stateObj = acc.get_accState(0);
-                                    if (stateObj is int stateInt) {
-                                        isSelected = (stateInt & 2) != 0; // STATE_SYSTEM_SELECTED
-                                    } else {
+                                    if (stateObj is int stateInt)
+                                        isSelected = (stateInt & 2) != 0; // STATE_SYSTEM_SELECTED = 2
+                                    else
                                         isSelected = child.Current.HasKeyboardFocus;
-                                    }
-                                } else {
-                                    isSelected = child.Current.HasKeyboardFocus;
                                 }
-                            } catch {
+                                else
+                                    isSelected = child.Current.HasKeyboardFocus;
+                            }
+                            catch
+                            {
                                 isSelected = child.Current.HasKeyboardFocus;
                             }
-                        }
-                            isSelected = child.Current.HasKeyboardFocus;
                         }
                     } catch { }
 
