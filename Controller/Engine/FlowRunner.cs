@@ -343,8 +343,7 @@ namespace GnwayController.Engine
                 bool isSelected = parts.Length > 0 && parts[0] == "[SELECTED]";
                 string rowData = parts.Length > 1 ? parts[1] : lines[i];
 
-                // 核心修复：防范多选或伪多选状态，只认第一个被选中的行
-                if (isSelected && selectedIdx < 0) 
+                if (isSelected && selectedIdx < 0)
                 {
                     selectedIdx = i;
                 }
@@ -354,7 +353,6 @@ namespace GnwayController.Engine
                     ? cols[a.ColIndex].Contains(a.MatchText)
                     : rowData.Contains(a.MatchText);
 
-                
                 if (hit)
                 {
                     hitIndices.Add(i);
@@ -364,29 +362,29 @@ namespace GnwayController.Engine
             if (hitIndices.Count == 0)
             {
                 Log($"  ✅ 表格中已无「{a.MatchText}」行，全部处理完成", LogLevel.Ok);
-                return true; // 通知 RunLoop 流程完成
+                return true;
             }
 
             Log($"  📊 [智能眼] 表格总揽：共扫描到 {lines.Length} 行数据，其中 {hitIndices.Count} 行状态包含「{a.MatchText}」(需处理)。", LogLevel.Info);
-            if(selectedIdx >= 0) {
+            if (selectedIdx >= 0)
+            {
                 bool selIsPending = hitIndices.Contains(selectedIdx);
                 Log($"  👁 [智能眼] 检测到当前正处于第 {selectedIdx} 行，该行状态: {(selIsPending ? "【待处理】" : "【无需处理/已完成】")}", LogLevel.Info);
-            } else {
+            }
+            else
+            {
                 Log($"  👁 [智能眼] 当前表格没有明确的高亮选中行，将从上到下按顺序检索", LogLevel.Info);
             }
 
             int targetIdx = -1;
 
-            // 第一道防线：优先检查当前真实处于焦点/选中的行是否待处理
             if (selectedIdx >= 0 && hitIndices.Contains(selectedIdx))
             {
                 targetIdx = selectedIdx;
                 Log($"  → 当前第 {targetIdx} 行已选中且含\"{a.MatchText}\"，直接锁定当前行动作", LogLevel.Ok);
-                // 去掉 return false，以便强制触发一次 gridselect (防范假选中，即有底色但 Detail 未加载)
             }
             else
             {
-                // 第二道防线：如果在当前选中行之后能找到符合条件的下一行
                 var nextIndices = hitIndices.Where(idx => idx > selectedIdx).ToList();
                 if (nextIndices.Any())
                 {
@@ -395,69 +393,17 @@ namespace GnwayController.Engine
                 }
                 else if (hitIndices.Any())
                 {
-                    // 第三道防线：兜底锁定最顶部的第一个（通常发生在循环重置时）
                     int fallbackIdx = hitIndices.First();
-                    
-                    // 防死循环：如果底层数据未刷新导致我们锁定回了当前刚刚处理完但仍显示未处理的行
                     if (fallbackIdx == selectedIdx)
                     {
                         Log($"  ✅ 触底且只剩当前行(大概率为界面未刷新)，视为处理完成", LogLevel.Ok);
-                        return true; 
+                        return true;
                     }
-                    
                     targetIdx = fallbackIdx;
                     Log($"  → 回到列表顶部，锁定第 {targetIdx} 行为目标", LogLevel.Info);
                 }
             }
 
-            // [重要修正] 必须无论如何都在这里触发一次强制选中事件，
-            // 防范由于底层软件状态重绘导致的假选中（看似有底色实则无 Detail Panel 加载）
-            string selResult = _client.Send(
-                $"gridselect|{evt.WindowName}|{a.ControlName}|{targetIdx}");
-            Log($"  → 强制触发选中 [{a.ControlName}] 第{targetIdx}行（含\"{a.MatchText}\"）：{OkOrErr(selResult)}",
-            }
-            
-            // 2. 如果当前行不是待处理，往下找下一条
-            targetIdx = hitIndices.FirstOrDefault(idx => idx > selectedIdx);
-            
-            // 3. 防死循环：如果往下找不到了
-            if (targetIdx == 0 && !hitIndices.Contains(0)) 
-            {
-            // 第一道防线：优先检查当前真实处于焦点/选中的行是否待处理
-            if (selectedIdx >= 0 && hitIndices.Contains(selectedIdx))
-            {
-                targetIdx = selectedIdx;
-                Log($"  → 当前第 {targetIdx} 行已选中且含\"{a.MatchText}\"，直接锁定当前行动作", LogLevel.Ok);
-                // 去掉 return false，以便强制触发一次 gridselect (防范假选中，即有底色但 Detail 未加载)
-            }
-            else
-            {
-                // 第二道防线：如果在当前选中行之后能找到符合条件的下一行
-                var nextIndices = hitIndices.Where(idx => idx > selectedIdx).ToList();
-                if (nextIndices.Any())
-                {
-                    targetIdx = nextIndices.First();
-                    Log($"  → 越过已处理数据，锁定后续第 {targetIdx} 行为目标", LogLevel.Info);
-                }
-                else if (hitIndices.Any())
-                {
-                    // 第三道防线：兜底锁定最顶部的第一个（通常发生在循环重置时）
-                    int fallbackIdx = hitIndices.First();
-                    
-                    // 防死循环：如果底层数据未刷新导致我们锁定回了当前刚刚处理完但仍显示未处理的行
-                    if (fallbackIdx == selectedIdx)
-                    {
-                        Log($"  ✅ 触底且只剩当前行(大概率为界面未刷新)，视为处理完成", LogLevel.Ok);
-                        return true; 
-                    }
-                    
-                    targetIdx = fallbackIdx;
-                    Log($"  → 回到列表顶部，锁定第 {targetIdx} 行为目标", LogLevel.Info);
-                }
-            }
-
-            // [重要修正] 必须无论如何都在这里触发一次强制选中事件，
-            // 防范由于底层软件状态重绘导致的假选中（看似有底色实则无 Detail Panel 加载）
             string selResult = _client.Send(
                 $"gridselect|{evt.WindowName}|{a.ControlName}|{targetIdx}");
             Log($"  → 强制触发选中 [{a.ControlName}] 第{targetIdx}行（含\"{a.MatchText}\"）：{OkOrErr(selResult)}",
