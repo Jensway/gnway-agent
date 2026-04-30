@@ -1,4 +1,4 @@
-// =============================================================
+﻿// =============================================================
 //  GnwayAgent - 鏈嶅姟绔?Agent (Native Win32 Edition)
 //  閮ㄧ讲鍒颁簯鑱旀湇鍔″櫒锛岄€氳繃鍛藉悕绠￠亾鎺ユ敹鍛戒护锛屾搷浣滃悓 Session 鍐呯殑绋嬪簭
 //  鍩轰簬 EnumChildWindows 瀹炵幇鏋侀€熸棤鎰熺煡銆佺簿鍑嗛€忚鐨?VB6 鎻愬彇
@@ -759,6 +759,23 @@ namespace GnwayAgent
                         if (child.TryGetCurrentPattern(SelectionItemPattern.Pattern, out object? sp)) {
                             isSelected = ((SelectionItemPattern)sp).Current.IsSelected;
                         } else {
+                            try {
+                                // 尝试通过底层 Win32/MSAA 提取 State 状态
+                                Guid iidAcc = new Guid("618736E0-3C3D-11CF-810C-00AA00389B71");
+                                if (AccessibleObjectFromWindow((IntPtr)child.Current.NativeWindowHandle, 0xFFFFFFFC, ref iidAcc, out object accObj) == 0 && accObj is Accessibility.IAccessible acc) {
+                                    object stateObj = acc.get_accState(0);
+                                    if (stateObj is int stateInt) {
+                                        isSelected = (stateInt & 2) != 0; // STATE_SYSTEM_SELECTED
+                                    } else {
+                                        isSelected = child.Current.HasKeyboardFocus;
+                                    }
+                                } else {
+                                    isSelected = child.Current.HasKeyboardFocus;
+                                }
+                            } catch {
+                                isSelected = child.Current.HasKeyboardFocus;
+                            }
+                        }
                             isSelected = child.Current.HasKeyboardFocus;
                         }
                     } catch { }

@@ -1,4 +1,4 @@
-// ============================================================
+﻿// ============================================================
 //  FlowRunner.cs — 基于录制事件的状态机执行引擎（后台线程）
 //
 //  核心流程：
@@ -382,6 +382,7 @@ namespace GnwayController.Engine
             {
                 targetIdx = selectedIdx;
                 Log($"  → 当前第 {targetIdx} 行已选中且含\"{a.MatchText}\"，直接锁定当前行动作", LogLevel.Ok);
+                // 去掉 return false，以便强制触发一次 gridselect (防范假选中，即有底色但 Detail 未加载)
             }
             else
             {
@@ -395,7 +396,62 @@ namespace GnwayController.Engine
                 else if (hitIndices.Any())
                 {
                     // 第三道防线：兜底锁定最顶部的第一个（通常发生在循环重置时）
-                    targetIdx = hitIndices.First();
+                    int fallbackIdx = hitIndices.First();
+                    
+                    // 防死循环：如果底层数据未刷新导致我们锁定回了当前刚刚处理完但仍显示未处理的行
+                    if (fallbackIdx == selectedIdx)
+                    {
+                        Log($"  ✅ 触底且只剩当前行(大概率为界面未刷新)，视为处理完成", LogLevel.Ok);
+                        return true; 
+                    }
+                    
+                    targetIdx = fallbackIdx;
+                    Log($"  → 回到列表顶部，锁定第 {targetIdx} 行为目标", LogLevel.Info);
+                }
+            }
+
+            // [重要修正] 必须无论如何都在这里触发一次强制选中事件，
+            // 防范由于底层软件状态重绘导致的假选中（看似有底色实则无 Detail Panel 加载）
+            string selResult = _client.Send(
+                $"gridselect|{evt.WindowName}|{a.ControlName}|{targetIdx}");
+            Log($"  → 强制触发选中 [{a.ControlName}] 第{targetIdx}行（含\"{a.MatchText}\"）：{OkOrErr(selResult)}",
+            }
+            
+            // 2. 如果当前行不是待处理，往下找下一条
+            targetIdx = hitIndices.FirstOrDefault(idx => idx > selectedIdx);
+            
+            // 3. 防死循环：如果往下找不到了
+            if (targetIdx == 0 && !hitIndices.Contains(0)) 
+            {
+            // 第一道防线：优先检查当前真实处于焦点/选中的行是否待处理
+            if (selectedIdx >= 0 && hitIndices.Contains(selectedIdx))
+            {
+                targetIdx = selectedIdx;
+                Log($"  → 当前第 {targetIdx} 行已选中且含\"{a.MatchText}\"，直接锁定当前行动作", LogLevel.Ok);
+                // 去掉 return false，以便强制触发一次 gridselect (防范假选中，即有底色但 Detail 未加载)
+            }
+            else
+            {
+                // 第二道防线：如果在当前选中行之后能找到符合条件的下一行
+                var nextIndices = hitIndices.Where(idx => idx > selectedIdx).ToList();
+                if (nextIndices.Any())
+                {
+                    targetIdx = nextIndices.First();
+                    Log($"  → 越过已处理数据，锁定后续第 {targetIdx} 行为目标", LogLevel.Info);
+                }
+                else if (hitIndices.Any())
+                {
+                    // 第三道防线：兜底锁定最顶部的第一个（通常发生在循环重置时）
+                    int fallbackIdx = hitIndices.First();
+                    
+                    // 防死循环：如果底层数据未刷新导致我们锁定回了当前刚刚处理完但仍显示未处理的行
+                    if (fallbackIdx == selectedIdx)
+                    {
+                        Log($"  ✅ 触底且只剩当前行(大概率为界面未刷新)，视为处理完成", LogLevel.Ok);
+                        return true; 
+                    }
+                    
+                    targetIdx = fallbackIdx;
                     Log($"  → 回到列表顶部，锁定第 {targetIdx} 行为目标", LogLevel.Info);
                 }
             }
