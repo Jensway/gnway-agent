@@ -27,6 +27,9 @@ namespace GnwayController.Engine
         private readonly int                 _startStep;
         private readonly int                 _timeoutSec;
         private readonly Action<EngineEvent> _emit;
+        private const int DefaultPostActionDelayMs = 800;
+        private const int GeneratePostClickMinDelayMs = 500;
+        private const int GeneratePostClickMaxDelayMs = 6000;
 
         private volatile bool _running;
         private volatile bool _paused;
@@ -118,7 +121,7 @@ namespace GnwayController.Engine
                     {
                         // ── 执行动作 ───────────────────────────
                         bool done = ExecuteAction(evt);
-                        Thread.Sleep(800); // 增加强制等待，增强下移一行或点击后的状态转移稳健性
+                        WaitAfterAction(evt); // 给动作后的界面刷新留缓冲，生成单据采用智能等待
 
                         if (done)
                         {
@@ -320,6 +323,69 @@ namespace GnwayController.Engine
                     break;
             }
             return false; // 未完成，继续循环
+        }
+
+        private void WaitAfterAction(AutoEvent evt)
+        {
+            if (IsGenerateClick(evt))
+            {
+                WaitForGenerateStability(evt.WindowName);
+                return;
+            }
+
+            Thread.Sleep(DefaultPostActionDelayMs);
+        }
+
+        private static bool IsGenerateClick(AutoEvent evt)
+        {
+            var a = evt.Action;
+            return (a.Type == "click" || a.Type == "popupclick")
+                && ((a.ControlName ?? "").Contains("生成")
+                    || (evt.Name ?? "").Contains("生成")
+                    || (a.Value ?? "").Contains("生成"));
+        }
+
+        private void WaitForGenerateStability(string windowName)
+        {
+            Log($"  ⏳ 生成动作完成，正在智能等待界面稳定...", LogLevel.Wait);
+            Thread.Sleep(GeneratePostClickMinDelayMs);
+
+            DateTime deadline = DateTime.Now.AddMilliseconds(GeneratePostClickMaxDelayMs);
+            string lastHash = "";
+            int stableCount = 0;
+
+            while (_running && DateTime.Now < deadline)
+            {
+                WaitWhilePaused();
+
+                try
+                {
+                    string res = _client.Send($"treehash|{windowName}");
+                    if (res.StartsWith("OK:"))
+                    {
+                        string currentHash = res.Substring(3);
+                        if (!string.IsNullOrEmpty(currentHash) && currentHash == lastHash)
+                        {
+                            stableCount++;
+                            if (stableCount >= 2)
+                            {
+                                Log($"  ✅ 生成后界面已稳定，继续下一步", LogLevel.Ok);
+                                return;
+                            }
+                        }
+                        else
+                        {
+                            stableCount = 0;
+                            lastHash = currentHash;
+                        }
+                    }
+                }
+                catch { }
+
+                Thread.Sleep(300);
+            }
+
+            Log($"  ⏱ 生成后智能等待已到上限，继续下一步", LogLevel.Wait);
         }
 
         private bool ExecuteGridNext(AutoEvent evt, EventAction a)

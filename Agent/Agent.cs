@@ -363,7 +363,7 @@ namespace GnwayAgent
             if (rect.Width <= 0 || rect.Height <= 0) return;
             var t = new Thread(() => {
                 try {
-                    int size = 60; 
+                    int size = 48;
                     int cx = rect.X + rect.Width / 2;
                     int cy = rect.Y + rect.Height / 2;
                     
@@ -375,7 +375,7 @@ namespace GnwayAgent
                         ShowInTaskbar = false,
                         StartPosition = System.Windows.Forms.FormStartPosition.Manual,
                         AutoScaleMode = System.Windows.Forms.AutoScaleMode.None,
-                        Bounds = new System.Drawing.Rectangle(cx - size / 2, cy - size / 2, size, size)
+                        Bounds = new System.Drawing.Rectangle(cx - size / 2, cy + rect.Height / 2 - 8, size, size)
                     };
                     
                     int tickCount = 0;
@@ -383,18 +383,18 @@ namespace GnwayAgent
                         e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
 
                         // 上下呼吸弹跳偏移 (利用正弦波产生平滑的上下浮动)
-                        float yOffset = (float)(Math.Sin(tickCount * 0.4) * 4); 
-                        e.Graphics.TranslateTransform(0, yOffset - 5); // 稍微往上提一点，让箭头尖端指向目标
+                        float yOffset = (float)(Math.Sin(tickCount * 0.4) * 3);
+                        e.Graphics.TranslateTransform(0, yOffset);
 
-                        // 绘制一个非常小巧、精致的指示箭头 (整体宽度约16像素，高度22像素)
+                        // 绘制一个更小的向上指示箭头，放在控件下方，箭尖朝向点击目标
                         var points = new System.Drawing.PointF[] {
-                            new System.Drawing.PointF(30, 32), // 箭头尖端
-                            new System.Drawing.PointF(22, 20), // 箭头左侧底翼
-                            new System.Drawing.PointF(27, 20), // 箭尾柄左内侧凹点
-                            new System.Drawing.PointF(27, 10), // 箭尾柄左侧顶部
-                            new System.Drawing.PointF(33, 10), // 箭尾柄右侧顶部
-                            new System.Drawing.PointF(33, 20), // 箭尾柄右内侧凹点
-                            new System.Drawing.PointF(38, 20)  // 箭头右侧底翼
+                            new System.Drawing.PointF(24, 7),  // 箭头尖端
+                            new System.Drawing.PointF(14, 19), // 箭头左侧底翼
+                            new System.Drawing.PointF(20, 19), // 箭尾柄左内侧凹点
+                            new System.Drawing.PointF(20, 34), // 箭尾柄左侧底部
+                            new System.Drawing.PointF(28, 34), // 箭尾柄右侧底部
+                            new System.Drawing.PointF(28, 19), // 箭尾柄右内侧凹点
+                            new System.Drawing.PointF(34, 19)  // 箭头右侧底翼
                         };
 
                         // 绘制阴影以增加立体和现代感
@@ -405,11 +405,11 @@ namespace GnwayAgent
                         using (var shadowBrush = new System.Drawing.SolidBrush(System.Drawing.Color.FromArgb(80, 0, 0, 0)))
                             e.Graphics.FillPolygon(shadowBrush, shadowPoints);
 
-                        // 绘制箭头主体内容（亮黄色填充）
-                        using (var brush = new System.Drawing.SolidBrush(System.Drawing.Color.FromArgb(250, 204, 21))) // 充满活力的黄
+                        // 绘制箭头主体内容（橙红色填充，更突出）
+                        using (var brush = new System.Drawing.SolidBrush(System.Drawing.Color.FromArgb(255, 92, 36)))
                             e.Graphics.FillPolygon(brush, points);
 
-                        // 绘制箭头边缘轮廓（深色或白色边框）
+                        // 绘制箭头边缘轮廓
                         using (var pen = new System.Drawing.Pen(System.Drawing.Color.White, 2f))
                         {
                             pen.LineJoin = System.Drawing.Drawing2D.LineJoin.Round;
