@@ -343,7 +343,7 @@ namespace GnwayAgent
         [DllImport("user32.dll")]
         static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int X, int Y, int cx, int cy, uint uFlags);
         static readonly IntPtr HWND_TOPMOST = new IntPtr(-1);
-        static readonly bool EnableClickHighlight = false;
+        static readonly bool EnableClickHighlight = true;
 
         class RadarForm : System.Windows.Forms.Form
         {
@@ -361,9 +361,8 @@ namespace GnwayAgent
 
         static void ShowClickHighlight(System.Drawing.Rectangle rect)
         {
-            // K3 Wise 14.3 windows are sensitive to visual overlays, and the old
-            // arrow cue is too distracting during unattended runs. Keep the hook
-            // here for future debugging, but default to no visual focus cue.
+            // K3 Wise 14.3 windows are sensitive to visual overlays, so the cue is
+            // a quiet blue outline around the target instead of the old arrow.
             if (!EnableClickHighlight) return;
 
             if (rect.Width <= 0 || rect.Height <= 0) return;
