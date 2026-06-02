@@ -35,7 +35,11 @@ namespace GnwayController.Engine
         private volatile bool _paused;
         private volatile bool _skipStep;
         private Thread?       _thread;
-        private bool          _advanceUnreadableGridOnNextCheck;
+        private bool          _awaitingGenerateResult;
+        private int           _executingStepIndex = -1;
+        private int           _lastGridStepIndex = -1;
+        private AutoEvent?    _lastGridEvent;
+        private EventAction?  _lastGridAction;
 
         public bool IsRunning => _running;
         public bool IsPaused  => _paused;
@@ -110,18 +114,32 @@ namespace GnwayController.Engine
                     bool matched = WaitForSnapshot(evt);
                     if (!matched)
                     {
+                        if (_awaitingGenerateResult)
+                        {
+                            _awaitingGenerateResult = false;
+                            AdvanceUnreadableGridRow("生成后未进入详情，判定当前行不可生成");
+                            current = _lastGridStepIndex >= 0 ? _lastGridStepIndex : 0;
+                            continue;
+                        }
+
                         Log($"  ⏰ 超时：控件树未就绪（步骤 {current + 1} {evt.Name}）", LogLevel.Error);
                         Emit(EngineEventType.Error,
                              $"超时：窗口 [{evt.WindowName}] 控件树不匹配", LogLevel.Error);
                         _running = false;
                         break;
                     }
+                    else if (_awaitingGenerateResult && !IsGenerateClick(evt))
+                    {
+                        _awaitingGenerateResult = false;
+                    }
 
                     if (_skipStep) { _skipStep = false; }
                     else
                     {
                         // ── 执行动作 ───────────────────────────
+                        _executingStepIndex = current;
                         bool done = ExecuteAction(evt);
+                        _executingStepIndex = -1;
                         WaitAfterAction(evt); // 给动作后的界面刷新留缓冲，生成单据采用智能等待
 
                         if (done)
@@ -273,7 +291,7 @@ namespace GnwayController.Engine
                     string r = _client.Send(cmd);
                     Log($"  → 点击 [{a.ControlName}]：{OkOrErr(r)}", r.StartsWith("OK") ? LogLevel.Ok : LogLevel.Warn);
                     if (r.StartsWith("OK") && IsGenerateClick(evt))
-                        _advanceUnreadableGridOnNextCheck = true;
+                        _awaitingGenerateResult = true;
                     break;
                 }
 
@@ -319,7 +337,7 @@ namespace GnwayController.Engine
                     Log($"  → 弹窗 [{evt.WindowName}] 点击 [{a.ControlName}]：{OkOrErr(r)}",
                         r.StartsWith("OK") ? LogLevel.Popup : LogLevel.Warn);
                     if (r.StartsWith("OK") && IsGenerateClick(evt))
-                        _advanceUnreadableGridOnNextCheck = true;
+                        _awaitingGenerateResult = true;
                     break;
                 }
 
@@ -395,6 +413,10 @@ namespace GnwayController.Engine
 
         private bool ExecuteGridNext(AutoEvent evt, EventAction a)
         {
+            _lastGridEvent = evt;
+            _lastGridAction = a;
+            _lastGridStepIndex = _executingStepIndex;
+
             string rowsResult = _client.Send($"gridrows|{evt.WindowName}|{a.ControlName}");
             if (!rowsResult.StartsWith("OK:"))
             {
@@ -451,32 +473,12 @@ namespace GnwayController.Engine
                 Log($"  🔎 未匹配到「{a.MatchText}」。已读取 {lines.Length} 行，可读内容 {readableRows} 行；前几行：{preview}", LogLevel.Warn);
                 if (lines.Length > 0 && rowPreview.All(IsGridContainerPreview))
                 {
-                    if (_advanceUnreadableGridOnNextCheck)
-                    {
-                        string moveResult = _client.Send($"sendkeys|{evt.WindowName}|{a.ControlName}|{{DOWN}}");
-                        _advanceUnreadableGridOnNextCheck = false;
-                        Log($"  ⚠ 表格只暴露容器名；上一轮已执行生成，先下移一行再继续：{OkOrErr(moveResult)}",
-                            moveResult.StartsWith("OK") ? LogLevel.Warn : LogLevel.Error);
-                    }
-                    else
-                    {
-                        Log($"  ⚠ 表格只暴露容器名；本轮按当前选中行继续，不再尝试读取状态", LogLevel.Warn);
-                    }
+                    Log($"  ⚠ 表格只暴露容器名；本轮按当前选中行继续，不再尝试读取状态", LogLevel.Warn);
                     return false;
                 }
                 if (lines.Length == 0)
                 {
-                    if (_advanceUnreadableGridOnNextCheck)
-                    {
-                        string moveResult = _client.Send($"sendkeys|{evt.WindowName}|{a.ControlName}|{{DOWN}}");
-                        _advanceUnreadableGridOnNextCheck = false;
-                        Log($"  ⚠ 表格未暴露可读取行；上一轮已执行生成，先下移一行再继续：{OkOrErr(moveResult)}",
-                            moveResult.StartsWith("OK") ? LogLevel.Warn : LogLevel.Error);
-                    }
-                    else
-                    {
-                        Log($"  ⚠ 表格未暴露可读取行，暂按当前选中行继续执行，不判定完成", LogLevel.Warn);
-                    }
+                    Log($"  ⚠ 表格未暴露可读取行，暂按当前选中行继续执行，不判定完成", LogLevel.Warn);
                     return false;
                 }
                 if (lines.Length > 0 && readableRows == 0)
@@ -559,6 +561,22 @@ namespace GnwayController.Engine
 
         private static string OkOrErr(string r)
             => r.StartsWith("OK") ? "✓" : "✗ " + r;
+
+        private bool AdvanceUnreadableGridRow(string reason)
+        {
+            if (_lastGridEvent == null || _lastGridAction == null)
+            {
+                Log($"  ⚠ {reason}，但没有可用的列表控件记录，无法下移", LogLevel.Warn);
+                return false;
+            }
+
+            string moveResult = _client.Send(
+                $"sendkeys|{_lastGridEvent.WindowName}|{_lastGridAction.ControlName}|{{DOWN}}");
+            Log($"  ⚠ {reason}，下移一行后回到列表重试：{OkOrErr(moveResult)}",
+                moveResult.StartsWith("OK") ? LogLevel.Warn : LogLevel.Error);
+            Thread.Sleep(DefaultPostActionDelayMs);
+            return moveResult.StartsWith("OK");
+        }
 
         private static List<string> BuildGridNextMatchTerms(string matchText)
         {
