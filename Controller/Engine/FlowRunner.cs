@@ -470,6 +470,12 @@ namespace GnwayController.Engine
                 }
             }
 
+            if (targetIdx < 0)
+            {
+                Log($"  ⚠ 未能确定下一条「{a.MatchText}」目标行，本轮跳过选行以避免误触", LogLevel.Warn);
+                return false;
+            }
+
             string selResult = _client.Send(
                 $"gridselect|{evt.WindowName}|{a.ControlName}|{targetIdx}");
             Log($"  → 强制触发选中 [{a.ControlName}] 第{targetIdx}行（含\"{a.MatchText}\"）：{OkOrErr(selResult)}",

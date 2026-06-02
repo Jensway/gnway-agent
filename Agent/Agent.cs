@@ -363,10 +363,10 @@ namespace GnwayAgent
             if (rect.Width <= 0 || rect.Height <= 0) return;
             var t = new Thread(() => {
                 try {
-                    int size = 48;
-                    int cx = rect.X + rect.Width / 2;
-                    int cy = rect.Y + rect.Height / 2;
-                    
+                    int pad = 6;
+                    int width = Math.Max(24, rect.Width + pad * 2);
+                    int height = Math.Max(18, rect.Height + pad * 2);
+
                     var f = new RadarForm {
                         FormBorderStyle = System.Windows.Forms.FormBorderStyle.None,
                         BackColor = System.Drawing.Color.Magenta,
@@ -375,52 +375,31 @@ namespace GnwayAgent
                         ShowInTaskbar = false,
                         StartPosition = System.Windows.Forms.FormStartPosition.Manual,
                         AutoScaleMode = System.Windows.Forms.AutoScaleMode.None,
-                        Bounds = new System.Drawing.Rectangle(cx - size / 2, cy + rect.Height / 2 - 8, size, size)
+                        Bounds = new System.Drawing.Rectangle(rect.X - pad, rect.Y - pad, width, height)
                     };
                     
                     int tickCount = 0;
                     f.Paint += (s, e) => {
                         e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
 
-                        // 上下呼吸弹跳偏移 (利用正弦波产生平滑的上下浮动)
-                        float yOffset = (float)(Math.Sin(tickCount * 0.4) * 3);
-                        e.Graphics.TranslateTransform(0, yOffset);
+                        float progress = Math.Min(1f, tickCount / 14f);
+                        int alpha = (int)(170 * (1f - progress));
+                        var box = new System.Drawing.RectangleF(2.5f, 2.5f, width - 5f, height - 5f);
 
-                        // 绘制一个更小的向上指示箭头，放在控件下方，箭尖朝向点击目标
-                        var points = new System.Drawing.PointF[] {
-                            new System.Drawing.PointF(24, 7),  // 箭头尖端
-                            new System.Drawing.PointF(14, 19), // 箭头左侧底翼
-                            new System.Drawing.PointF(20, 19), // 箭尾柄左内侧凹点
-                            new System.Drawing.PointF(20, 34), // 箭尾柄左侧底部
-                            new System.Drawing.PointF(28, 34), // 箭尾柄右侧底部
-                            new System.Drawing.PointF(28, 19), // 箭尾柄右内侧凹点
-                            new System.Drawing.PointF(34, 19)  // 箭头右侧底翼
-                        };
+                        using (var fill = new System.Drawing.SolidBrush(System.Drawing.Color.FromArgb(Math.Max(0, alpha / 4), 56, 132, 255)))
+                            e.Graphics.FillRectangle(fill, box);
 
-                        // 绘制阴影以增加立体和现代感
-                        var shadowPoints = new System.Drawing.PointF[points.Length];
-                        for(int i = 0; i < points.Length; i++) {
-                            shadowPoints[i] = new System.Drawing.PointF(points[i].X + 2, points[i].Y + 3);
-                        }
-                        using (var shadowBrush = new System.Drawing.SolidBrush(System.Drawing.Color.FromArgb(80, 0, 0, 0)))
-                            e.Graphics.FillPolygon(shadowBrush, shadowPoints);
-
-                        // 绘制箭头主体内容（橙红色填充，更突出）
-                        using (var brush = new System.Drawing.SolidBrush(System.Drawing.Color.FromArgb(255, 92, 36)))
-                            e.Graphics.FillPolygon(brush, points);
-
-                        // 绘制箭头边缘轮廓
-                        using (var pen = new System.Drawing.Pen(System.Drawing.Color.White, 2f))
+                        using (var pen = new System.Drawing.Pen(System.Drawing.Color.FromArgb(Math.Max(0, alpha), 56, 132, 255), 2.5f))
                         {
                             pen.LineJoin = System.Drawing.Drawing2D.LineJoin.Round;
-                            e.Graphics.DrawPolygon(pen, points);
+                            e.Graphics.DrawRectangle(pen, box.X, box.Y, box.Width, box.Height);
                         }
                     };
                     
-                    var tmr = new System.Windows.Forms.Timer { Interval = 30 };
+                    var tmr = new System.Windows.Forms.Timer { Interval = 35 };
                     tmr.Tick += (s, e) => { 
                         tickCount++; 
-                        if (tickCount >= 25) { tmr.Stop(); f.Close(); } 
+                        if (tickCount >= 14) { tmr.Stop(); f.Close(); } 
                         else {
                             SetWindowPos(f.Handle, HWND_TOPMOST, 0, 0, 0, 0, 0x0002 | 0x0001 | 0x0010 /* SWP_NOACTIVATE */);
                             f.Invalidate(); 
