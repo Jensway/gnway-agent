@@ -790,6 +790,10 @@ namespace GnwayAgent
                 }
                 child = walker.GetNextSibling(child);
             }
+            if (rowIdx == 0)
+            {
+                return DoMsaaGridRows(grid, maxRows);
+            }
             return sb.ToString().TrimEnd();
         }
 
@@ -855,7 +859,205 @@ namespace GnwayAgent
                 }
                 child = walker.GetNextSibling(child);
             }
-            return $"ERR:row_out_of_bounds";
+
+            return DoMsaaGridSelect(grid, rowIndex);
+        }
+
+        class MsaaGridCell
+        {
+            public string Text = "";
+            public int Left;
+            public int Top;
+            public int Right;
+            public int Bottom;
+            public bool Selected;
+        }
+
+        class MsaaGridRow
+        {
+            public readonly List<MsaaGridCell> Cells = new List<MsaaGridCell>();
+            public int Top = int.MaxValue;
+            public int Bottom = int.MinValue;
+            public int Left = int.MaxValue;
+            public int Right = int.MinValue;
+            public bool Selected;
+
+            public void Add(MsaaGridCell cell)
+            {
+                Cells.Add(cell);
+                Top = Math.Min(Top, cell.Top);
+                Bottom = Math.Max(Bottom, cell.Bottom);
+                Left = Math.Min(Left, cell.Left);
+                Right = Math.Max(Right, cell.Right);
+                Selected = Selected || cell.Selected;
+            }
+        }
+
+        static string DoMsaaGridRows(IntPtr grid, int maxRows)
+        {
+            var rows = BuildMsaaGridRows(grid, maxRows);
+            var sb = new StringBuilder("OK:\n");
+            foreach (var row in rows)
+            {
+                row.Cells.Sort((a, b) => a.Left.CompareTo(b.Left));
+                var cols = new List<string> { row.Selected ? "[SELECTED]" : "[UNSELECTED]" };
+                foreach (var cell in row.Cells)
+                {
+                    if (!cols.Contains(cell.Text)) cols.Add(cell.Text);
+                }
+                sb.AppendLine(string.Join("\t", cols));
+            }
+            return sb.ToString().TrimEnd();
+        }
+
+        static string DoMsaaGridSelect(IntPtr grid, int rowIndex)
+        {
+            var rows = BuildMsaaGridRows(grid, Math.Max(rowIndex + 1, 500));
+            if (rowIndex < 0 || rowIndex >= rows.Count) return $"ERR:row_out_of_bounds";
+
+            var row = rows[rowIndex];
+            int x = row.Left == int.MaxValue ? 0 : row.Left + 10;
+            int y = row.Top == int.MaxValue || row.Bottom == int.MinValue ? 0 : row.Top + Math.Max(1, (row.Bottom - row.Top) / 2);
+            if (x <= 0 || y <= 0)
+            {
+                GetWindowRect(grid, out RECT rect);
+                x = rect.Left + 10;
+                y = rect.Top + 10;
+            }
+
+            ShowClickHighlight(new System.Drawing.Rectangle(Math.Max(0, row.Left), Math.Max(0, row.Top), Math.Max(1, row.Right - row.Left), Math.Max(1, row.Bottom - row.Top)));
+            System.Windows.Forms.Cursor.Position = new System.Drawing.Point(x, y);
+            Thread.Sleep(60);
+            mouse_event(MOUSEEVENTF_LEFTDOWN, x, y, 0, 0);
+            Thread.Sleep(50);
+            mouse_event(MOUSEEVENTF_LEFTUP, x, y, 0, 0);
+            Thread.Sleep(120);
+            return $"OK:msaa_selected_row_{rowIndex}";
+        }
+
+        static List<MsaaGridRow> BuildMsaaGridRows(IntPtr grid, int maxRows)
+        {
+            var cells = new List<MsaaGridCell>();
+            try
+            {
+                Guid iidAcc = new Guid("618736E0-3C3D-11CF-810C-00AA00389B71");
+                if (AccessibleObjectFromWindow(grid, OBJID_CLIENT, ref iidAcc, out object accObj) != 0 ||
+                    !(accObj is Accessibility.IAccessible acc))
+                {
+                    return new List<MsaaGridRow>();
+                }
+
+                GetWindowRect(grid, out RECT gridRect);
+                CollectMsaaCells(acc, 0, gridRect, cells, 0);
+            }
+            catch { return new List<MsaaGridRow>(); }
+
+            cells.Sort((a, b) =>
+            {
+                int y = a.Top.CompareTo(b.Top);
+                return y != 0 ? y : a.Left.CompareTo(b.Left);
+            });
+
+            var rows = new List<MsaaGridRow>();
+            foreach (var cell in cells)
+            {
+                MsaaGridRow? row = null;
+                foreach (var existing in rows)
+                {
+                    if (Math.Abs(existing.Top - cell.Top) <= 8)
+                    {
+                        row = existing;
+                        break;
+                    }
+                }
+                if (row == null)
+                {
+                    row = new MsaaGridRow();
+                    rows.Add(row);
+                }
+                row.Add(cell);
+                if (rows.Count >= maxRows) break;
+            }
+            return rows;
+        }
+
+        static void CollectMsaaCells(Accessibility.IAccessible acc, object childId, RECT gridRect, List<MsaaGridCell> cells, int depth)
+        {
+            if (depth > 6) return;
+
+            TryAddMsaaCell(acc, childId, gridRect, cells);
+
+            int childCount = 0;
+            try { childCount = acc.accChildCount; } catch { }
+            if (childCount <= 0) return;
+
+            object[] children = new object[childCount];
+            try
+            {
+                AccessibleChildren(acc, 0, childCount, children, out int obtained);
+                for (int i = 0; i < obtained; i++)
+                {
+                    object child = children[i];
+                    if (child is Accessibility.IAccessible childAcc)
+                    {
+                        CollectMsaaCells(childAcc, 0, gridRect, cells, depth + 1);
+                    }
+                    else
+                    {
+                        TryAddMsaaCell(acc, child, gridRect, cells);
+                        try
+                        {
+                            object nested = acc.get_accChild(child);
+                            if (nested is Accessibility.IAccessible nestedAcc)
+                                CollectMsaaCells(nestedAcc, 0, gridRect, cells, depth + 1);
+                        }
+                        catch { }
+                    }
+                }
+            }
+            catch { }
+        }
+
+        static void TryAddMsaaCell(Accessibility.IAccessible acc, object childId, RECT gridRect, List<MsaaGridCell> cells)
+        {
+            string text = "";
+            try { text = acc.get_accName(childId) ?? ""; } catch { }
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                try { text = acc.get_accValue(childId) ?? ""; } catch { }
+            }
+            text = (text ?? "").Trim();
+            if (string.IsNullOrWhiteSpace(text)) return;
+
+            int x = 0, y = 0, w = 0, h = 0;
+            try { acc.accLocation(out x, out y, out w, out h, childId); } catch { }
+            if (w <= 0 || h <= 0) return;
+            if (x < gridRect.Left - 2 || y < gridRect.Top - 2 || x > gridRect.Right + 2 || y > gridRect.Bottom + 2) return;
+
+            bool selected = false;
+            try
+            {
+                object stateObj = acc.get_accState(childId);
+                if (stateObj is int stateInt)
+                    selected = (stateInt & 2) != 0; // STATE_SYSTEM_SELECTED
+            }
+            catch { }
+
+            foreach (var existing in cells)
+            {
+                if (existing.Text == text && Math.Abs(existing.Left - x) <= 2 && Math.Abs(existing.Top - y) <= 2)
+                    return;
+            }
+
+            cells.Add(new MsaaGridCell
+            {
+                Text = text,
+                Left = x,
+                Top = y,
+                Right = x + w,
+                Bottom = y + h,
+                Selected = selected
+            });
         }
 
         static string DoPopupInfo(IntPtr window, string[] parts)

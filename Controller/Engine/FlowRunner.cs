@@ -444,6 +444,11 @@ namespace GnwayController.Engine
             {
                 string preview = rowPreview.Count > 0 ? string.Join(" / ", rowPreview) : "<无行>";
                 Log($"  🔎 未匹配到「{a.MatchText}」。已读取 {lines.Length} 行，可读内容 {readableRows} 行；前几行：{preview}", LogLevel.Warn);
+                if (lines.Length == 0)
+                {
+                    Log($"  ⚠ 表格未暴露可读取行，暂按当前选中行继续执行，不判定完成", LogLevel.Warn);
+                    return false;
+                }
                 if (lines.Length > 0 && readableRows == 0)
                 {
                     Log($"  ⚠ 表格行存在但内容为空，暂不判定完成；请等待下一轮或检查表格读取", LogLevel.Warn);
