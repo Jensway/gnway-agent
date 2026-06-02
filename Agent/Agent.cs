@@ -15,6 +15,7 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
 using System.Text.RegularExpressions;
+using System.Linq;
 using System.Windows.Automation;
 
 namespace GnwayAgent
@@ -918,7 +919,9 @@ namespace GnwayAgent
         static string DoMsaaGridSelect(IntPtr grid, int rowIndex)
         {
             var rows = BuildMsaaGridRows(grid, Math.Max(rowIndex + 1, 500));
-            if (rowIndex < 0 || rowIndex >= rows.Count) return $"ERR:row_out_of_bounds";
+            rows = rows.Where(r => !IsMsaaContainerOnlyRow(r)).ToList();
+            if (rowIndex < 0) return $"ERR:row_out_of_bounds";
+            if (rowIndex >= rows.Count) return DoEstimatedGridSelect(grid, rowIndex);
 
             var row = rows[rowIndex];
             int x = row.Left == int.MaxValue ? 0 : row.Left + 10;
@@ -938,6 +941,29 @@ namespace GnwayAgent
             mouse_event(MOUSEEVENTF_LEFTUP, x, y, 0, 0);
             Thread.Sleep(120);
             return $"OK:msaa_selected_row_{rowIndex}";
+        }
+
+        static string DoEstimatedGridSelect(IntPtr grid, int rowIndex)
+        {
+            GetWindowRect(grid, out RECT rect);
+            int width = rect.Right - rect.Left;
+            int height = rect.Bottom - rect.Top;
+            if (width <= 0 || height <= 0) return $"ERR:row_out_of_bounds";
+
+            int header = Math.Min(28, Math.Max(0, height / 8));
+            int rowHeight = 22;
+            int x = rect.Left + Math.Max(10, width / 6);
+            int y = rect.Top + header + rowHeight * rowIndex + rowHeight / 2;
+            if (y >= rect.Bottom) y = rect.Bottom - 4;
+
+            ShowClickHighlight(new System.Drawing.Rectangle(rect.Left, Math.Max(rect.Top, y - rowHeight / 2), width, rowHeight));
+            System.Windows.Forms.Cursor.Position = new System.Drawing.Point(x, y);
+            Thread.Sleep(60);
+            mouse_event(MOUSEEVENTF_LEFTDOWN, x, y, 0, 0);
+            Thread.Sleep(50);
+            mouse_event(MOUSEEVENTF_LEFTUP, x, y, 0, 0);
+            Thread.Sleep(120);
+            return $"OK:estimated_selected_row_{rowIndex}";
         }
 
         static List<MsaaGridRow> BuildMsaaGridRows(IntPtr grid, int maxRows)
@@ -966,6 +992,7 @@ namespace GnwayAgent
             var rows = new List<MsaaGridRow>();
             foreach (var cell in cells)
             {
+                if (IsMsaaContainerText(cell.Text)) continue;
                 MsaaGridRow? row = null;
                 foreach (var existing in rows)
                 {
@@ -985,6 +1012,12 @@ namespace GnwayAgent
             }
             return rows;
         }
+
+        static bool IsMsaaContainerOnlyRow(MsaaGridRow row)
+            => row.Cells.Count > 0 && row.Cells.All(c => IsMsaaContainerText(c.Text));
+
+        static bool IsMsaaContainerText(string text)
+            => Regex.IsMatch((text ?? "").Trim(), @"^(Frame|ThunderRT6Frame|ThunderRT6UserControl|Panel|Pane)\d*$", RegexOptions.IgnoreCase);
 
         static void CollectMsaaCells(Accessibility.IAccessible acc, object childId, RECT gridRect, List<MsaaGridCell> cells, int depth)
         {

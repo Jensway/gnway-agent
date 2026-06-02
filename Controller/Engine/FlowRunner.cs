@@ -444,6 +444,14 @@ namespace GnwayController.Engine
             {
                 string preview = rowPreview.Count > 0 ? string.Join(" / ", rowPreview) : "<无行>";
                 Log($"  🔎 未匹配到「{a.MatchText}」。已读取 {lines.Length} 行，可读内容 {readableRows} 行；前几行：{preview}", LogLevel.Warn);
+                if (lines.Length > 0 && rowPreview.All(IsGridContainerPreview))
+                {
+                    int nextIdx = selectedIdx >= 0 ? selectedIdx + 1 : 1;
+                    string moveResult = _client.Send($"gridselect|{evt.WindowName}|{a.ControlName}|{nextIdx}");
+                    Log($"  ⚠ 只读到表格容器名，尝试下移到第 {nextIdx} 行继续判断：{OkOrErr(moveResult)}",
+                        moveResult.StartsWith("OK") ? LogLevel.Warn : LogLevel.Error);
+                    return false;
+                }
                 if (lines.Length == 0)
                 {
                     Log($"  ⚠ 表格未暴露可读取行，暂按当前选中行继续执行，不判定完成", LogLevel.Warn);
@@ -553,6 +561,9 @@ namespace GnwayController.Engine
 
         private static string NormalizeGridText(string text)
             => new string((text ?? "").Where(c => !char.IsWhiteSpace(c)).ToArray());
+
+        private static bool IsGridContainerPreview(string text)
+            => System.Text.RegularExpressions.Regex.IsMatch((text ?? "").Trim(), @"^(Frame|ThunderRT6Frame|ThunderRT6UserControl|Panel|Pane)\d*$", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
 
         private void Log(string msg, LogLevel level = LogLevel.Info)
             => Emit(EngineEventType.Log, msg, level);
