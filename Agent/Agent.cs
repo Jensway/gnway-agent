@@ -765,14 +765,26 @@ namespace GnwayAgent
                     cols.Add(isSelected ? "[SELECTED]" : "[UNSELECTED]");
 
                     var cell = walker.GetFirstChild(child);
+                    int cellValueCount = 0;
                     while (cell != null)
                     {
-                        cols.Add(cell.TryGetCurrentPattern(ValuePattern.Pattern, out object? vp) 
+                        string cellText = cell.TryGetCurrentPattern(ValuePattern.Pattern, out object? vp) 
                             ? ((ValuePattern)vp).Current.Value 
-                            : (cell.Current.Name ?? ""));
+                            : (cell.Current.Name ?? "");
+                        cols.Add(cellText);
+                        if (!string.IsNullOrWhiteSpace(cellText)) cellValueCount++;
                         cell = walker.GetNextSibling(cell);
                     }
-                    if (cols.Count == 0) cols.Add(child.Current.Name ?? "");
+
+                    // Some VB6/K3 grids expose the row text on the row element itself
+                    // instead of as child cells. Keep that text, otherwise gridnext sees
+                    // rows but no searchable content and may incorrectly finish.
+                    if (cellValueCount == 0)
+                    {
+                        string rowName = child.Current.Name ?? "";
+                        if (!string.IsNullOrWhiteSpace(rowName)) cols.Add(rowName);
+                    }
+
                     sb.AppendLine(string.Join("\t", cols));
                     rowIdx++;
                 }

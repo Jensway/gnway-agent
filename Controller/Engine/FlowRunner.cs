@@ -402,12 +402,24 @@ namespace GnwayController.Engine
 
             int selectedIdx = -1;
             List<int> hitIndices = new List<int>();
+            List<string> rowPreview = new List<string>();
+            var matchTerms = BuildGridNextMatchTerms(a.MatchText);
+            int readableRows = 0;
 
             for (int i = 0; i < lines.Length; i++)
             {
                 var parts = lines[i].Split(new[] { '\t' }, 2);
                 bool isSelected = parts.Length > 0 && parts[0] == "[SELECTED]";
                 string rowData = parts.Length > 1 ? parts[1] : lines[i];
+                string normalizedRow = NormalizeGridText(rowData);
+
+                if (!string.IsNullOrWhiteSpace(rowData)) readableRows++;
+                if (rowPreview.Count < 5)
+                {
+                    rowPreview.Add(string.IsNullOrWhiteSpace(rowData)
+                        ? "<空行>"
+                        : rowData.Length > 80 ? rowData.Substring(0, 80) + "..." : rowData);
+                }
 
                 if (isSelected && selectedIdx < 0)
                 {
@@ -415,9 +427,12 @@ namespace GnwayController.Engine
                 }
 
                 var cols = rowData.Split('\t');
-                bool hit = a.ColIndex < cols.Length
-                    ? cols[a.ColIndex].Contains(a.MatchText)
-                    : rowData.Contains(a.MatchText);
+                string targetText = a.ColIndex < cols.Length
+                    ? cols[a.ColIndex]
+                    : rowData;
+                string normalizedTarget = NormalizeGridText(targetText);
+                bool hit = matchTerms.Any(term =>
+                    normalizedTarget.Contains(term) || normalizedRow.Contains(term));
 
                 if (hit)
                 {
@@ -427,6 +442,13 @@ namespace GnwayController.Engine
 
             if (hitIndices.Count == 0)
             {
+                string preview = rowPreview.Count > 0 ? string.Join(" / ", rowPreview) : "<无行>";
+                Log($"  🔎 未匹配到「{a.MatchText}」。已读取 {lines.Length} 行，可读内容 {readableRows} 行；前几行：{preview}", LogLevel.Warn);
+                if (lines.Length > 0 && readableRows == 0)
+                {
+                    Log($"  ⚠ 表格行存在但内容为空，暂不判定完成；请等待下一轮或检查表格读取", LogLevel.Warn);
+                    return false;
+                }
                 Log($"  ✅ 表格中已无「{a.MatchText}」行，全部处理完成", LogLevel.Ok);
                 return true;
             }
@@ -502,6 +524,30 @@ namespace GnwayController.Engine
 
         private static string OkOrErr(string r)
             => r.StartsWith("OK") ? "✓" : "✗ " + r;
+
+        private static List<string> BuildGridNextMatchTerms(string matchText)
+        {
+            var rawTerms = (matchText ?? "")
+                .Split(new[] { '|', ',', '，', ';', '；', '/', '、' }, StringSplitOptions.RemoveEmptyEntries)
+                .Select(NormalizeGridText)
+                .Where(x => !string.IsNullOrEmpty(x))
+                .ToList();
+
+            if (rawTerms.Count == 0)
+                rawTerms.Add("待生成");
+
+            if (rawTerms.Contains("待生成"))
+            {
+                rawTerms.Add("未生成");
+                rawTerms.Add("待处理");
+                rawTerms.Add("未处理");
+            }
+
+            return rawTerms.Distinct().ToList();
+        }
+
+        private static string NormalizeGridText(string text)
+            => new string((text ?? "").Where(c => !char.IsWhiteSpace(c)).ToArray());
 
         private void Log(string msg, LogLevel level = LogLevel.Info)
             => Emit(EngineEventType.Log, msg, level);
