@@ -35,6 +35,7 @@ namespace GnwayController.Engine
         private volatile bool _paused;
         private volatile bool _skipStep;
         private Thread?       _thread;
+        private bool          _advanceUnreadableGridOnNextCheck;
 
         public bool IsRunning => _running;
         public bool IsPaused  => _paused;
@@ -271,6 +272,8 @@ namespace GnwayController.Engine
                         : $"click|{evt.WindowName}|{a.ControlName}|{a.Value}";
                     string r = _client.Send(cmd);
                     Log($"  → 点击 [{a.ControlName}]：{OkOrErr(r)}", r.StartsWith("OK") ? LogLevel.Ok : LogLevel.Warn);
+                    if (r.StartsWith("OK") && IsGenerateClick(evt))
+                        _advanceUnreadableGridOnNextCheck = true;
                     break;
                 }
 
@@ -315,6 +318,8 @@ namespace GnwayController.Engine
                     string r = _client.Send(cmd);
                     Log($"  → 弹窗 [{evt.WindowName}] 点击 [{a.ControlName}]：{OkOrErr(r)}",
                         r.StartsWith("OK") ? LogLevel.Popup : LogLevel.Warn);
+                    if (r.StartsWith("OK") && IsGenerateClick(evt))
+                        _advanceUnreadableGridOnNextCheck = true;
                     break;
                 }
 
@@ -446,15 +451,32 @@ namespace GnwayController.Engine
                 Log($"  🔎 未匹配到「{a.MatchText}」。已读取 {lines.Length} 行，可读内容 {readableRows} 行；前几行：{preview}", LogLevel.Warn);
                 if (lines.Length > 0 && rowPreview.All(IsGridContainerPreview))
                 {
-                    int nextIdx = selectedIdx >= 0 ? selectedIdx + 1 : 1;
-                    string moveResult = _client.Send($"gridselect|{evt.WindowName}|{a.ControlName}|{nextIdx}");
-                    Log($"  ⚠ 只读到表格容器名，尝试下移到第 {nextIdx} 行继续判断：{OkOrErr(moveResult)}",
-                        moveResult.StartsWith("OK") ? LogLevel.Warn : LogLevel.Error);
+                    if (_advanceUnreadableGridOnNextCheck)
+                    {
+                        string moveResult = _client.Send($"sendkeys|{evt.WindowName}|{a.ControlName}|{{DOWN}}");
+                        _advanceUnreadableGridOnNextCheck = false;
+                        Log($"  ⚠ 表格只暴露容器名；上一轮已执行生成，先下移一行再继续：{OkOrErr(moveResult)}",
+                            moveResult.StartsWith("OK") ? LogLevel.Warn : LogLevel.Error);
+                    }
+                    else
+                    {
+                        Log($"  ⚠ 表格只暴露容器名；本轮按当前选中行继续，不再尝试读取状态", LogLevel.Warn);
+                    }
                     return false;
                 }
                 if (lines.Length == 0)
                 {
-                    Log($"  ⚠ 表格未暴露可读取行，暂按当前选中行继续执行，不判定完成", LogLevel.Warn);
+                    if (_advanceUnreadableGridOnNextCheck)
+                    {
+                        string moveResult = _client.Send($"sendkeys|{evt.WindowName}|{a.ControlName}|{{DOWN}}");
+                        _advanceUnreadableGridOnNextCheck = false;
+                        Log($"  ⚠ 表格未暴露可读取行；上一轮已执行生成，先下移一行再继续：{OkOrErr(moveResult)}",
+                            moveResult.StartsWith("OK") ? LogLevel.Warn : LogLevel.Error);
+                    }
+                    else
+                    {
+                        Log($"  ⚠ 表格未暴露可读取行，暂按当前选中行继续执行，不判定完成", LogLevel.Warn);
+                    }
                     return false;
                 }
                 if (lines.Length > 0 && readableRows == 0)
