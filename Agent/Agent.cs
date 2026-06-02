@@ -363,15 +363,15 @@ namespace GnwayAgent
         static void ShowClickHighlight(System.Drawing.Rectangle rect)
         {
             // K3 Wise 14.3 windows are sensitive to visual overlays, so the cue is
-            // a quiet blue outline around the target instead of the old arrow.
+            // a compact teal target marker near the click point instead of the old arrow.
             if (!EnableClickHighlight) return;
 
             if (rect.Width <= 0 || rect.Height <= 0) return;
             var t = new Thread(() => {
                 try {
-                    int pad = 6;
-                    int width = Math.Max(24, rect.Width + pad * 2);
-                    int height = Math.Max(18, rect.Height + pad * 2);
+                    int size = 34;
+                    int cx = rect.X + rect.Width / 2;
+                    int cy = rect.Y + rect.Height / 2;
 
                     var f = new RadarForm {
                         FormBorderStyle = System.Windows.Forms.FormBorderStyle.None,
@@ -381,31 +381,40 @@ namespace GnwayAgent
                         ShowInTaskbar = false,
                         StartPosition = System.Windows.Forms.FormStartPosition.Manual,
                         AutoScaleMode = System.Windows.Forms.AutoScaleMode.None,
-                        Bounds = new System.Drawing.Rectangle(rect.X - pad, rect.Y - pad, width, height)
+                        Bounds = new System.Drawing.Rectangle(cx - size / 2, cy - size / 2, size, size)
                     };
                     
                     int tickCount = 0;
                     f.Paint += (s, e) => {
                         e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
 
-                        float progress = Math.Min(1f, tickCount / 14f);
-                        int alpha = (int)(170 * (1f - progress));
-                        var box = new System.Drawing.RectangleF(2.5f, 2.5f, width - 5f, height - 5f);
+                        float progress = Math.Min(1f, tickCount / 12f);
+                        float pulse = 1f + progress * 0.35f;
+                        int alpha = (int)(190 * (1f - progress));
+                        float outer = 10f * pulse;
+                        float inner = 3.5f;
+                        float center = size / 2f;
 
-                        using (var fill = new System.Drawing.SolidBrush(System.Drawing.Color.FromArgb(Math.Max(0, alpha / 4), 56, 132, 255)))
-                            e.Graphics.FillRectangle(fill, box);
+                        using (var fill = new System.Drawing.SolidBrush(System.Drawing.Color.FromArgb(Math.Max(0, alpha / 5), 0, 150, 136)))
+                            e.Graphics.FillEllipse(fill, center - outer, center - outer, outer * 2, outer * 2);
 
-                        using (var pen = new System.Drawing.Pen(System.Drawing.Color.FromArgb(Math.Max(0, alpha), 56, 132, 255), 2.5f))
+                        using (var pen = new System.Drawing.Pen(System.Drawing.Color.FromArgb(Math.Max(0, alpha), 0, 150, 136), 2f))
                         {
-                            pen.LineJoin = System.Drawing.Drawing2D.LineJoin.Round;
-                            e.Graphics.DrawRectangle(pen, box.X, box.Y, box.Width, box.Height);
+                            e.Graphics.DrawEllipse(pen, center - outer, center - outer, outer * 2, outer * 2);
+                            e.Graphics.DrawLine(pen, center - 13, center, center - 7, center);
+                            e.Graphics.DrawLine(pen, center + 7, center, center + 13, center);
+                            e.Graphics.DrawLine(pen, center, center - 13, center, center - 7);
+                            e.Graphics.DrawLine(pen, center, center + 7, center, center + 13);
                         }
+
+                        using (var dot = new System.Drawing.SolidBrush(System.Drawing.Color.FromArgb(Math.Max(0, alpha), 0, 150, 136)))
+                            e.Graphics.FillEllipse(dot, center - inner, center - inner, inner * 2, inner * 2);
                     };
                     
                     var tmr = new System.Windows.Forms.Timer { Interval = 35 };
                     tmr.Tick += (s, e) => { 
                         tickCount++; 
-                        if (tickCount >= 14) { tmr.Stop(); f.Close(); } 
+                        if (tickCount >= 12) { tmr.Stop(); f.Close(); } 
                         else {
                             SetWindowPos(f.Handle, HWND_TOPMOST, 0, 0, 0, 0, 0x0002 | 0x0001 | 0x0010 /* SWP_NOACTIVATE */);
                             f.Invalidate(); 
