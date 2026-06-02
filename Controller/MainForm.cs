@@ -26,12 +26,12 @@ namespace GnwayController
     public class MainForm : Form
     {
         // ── 设计令牌 ──────────────────────────────────────────
-        static readonly Font F_BODY  = new Font("Microsoft YaHei", 9f);
-        static readonly Font F_SMALL = new Font("Microsoft YaHei", 8.5f);
-        static readonly Font F_BOLD  = new Font("Microsoft YaHei", 9f, FontStyle.Bold);
-        static readonly Font F_LOG   = new Font("Consolas",  9f);
-        static readonly Font F_TITLE = new Font("Microsoft YaHei", 10f, FontStyle.Bold);
-        static readonly Font F_MONO  = new Font("Consolas",  8.5f);
+        static readonly Font F_BODY  = new Font("Microsoft YaHei UI", 10.5f);
+        static readonly Font F_SMALL = new Font("Microsoft YaHei UI", 9.5f);
+        static readonly Font F_BOLD  = new Font("Microsoft YaHei UI", 10.5f, FontStyle.Bold);
+        static readonly Font F_LOG   = new Font("Microsoft YaHei UI", 10f);
+        static readonly Font F_TITLE = new Font("Microsoft YaHei UI", 11.5f, FontStyle.Bold);
+        static readonly Font F_MONO  = new Font("Consolas",  9.5f);
 
         static readonly Color C_BG      = Color.FromArgb(242, 245, 250);
         static readonly Color C_CARD    = Color.White;
@@ -160,8 +160,8 @@ namespace GnwayController
             };
             toolbar.Controls.Add(_tbServer); x += 140;
 
-            _btnTest = Btn("连接测试", toolbar, new Point(x, 24), 80, C_ACCENT, Color.White);
-            _btnTest.Click += OnTestConnect; x += 90;
+            _btnTest = Btn("连接测试", toolbar, new Point(x, 24), 90, C_ACCENT, Color.White);
+            _btnTest.Click += OnTestConnect; x += 100;
 
             _lblConn = new Label {
                 Location = new Point(x, 29), AutoSize = true,
@@ -170,12 +170,12 @@ namespace GnwayController
             
             toolbar.Controls.Add(_lblConn); x += 105;
 
-            _btnRefreshWins = Btn("🔄 获取全部窗口", toolbar, new Point(x, 24), 110, C_BG, C_TEXT);
+            _btnRefreshWins = Btn("🔄 获取全部窗口", toolbar, new Point(x, 24), 128, C_BG, C_TEXT);
             _btnRefreshWins.Click += OnGetWindows;
-            toolbar.Controls.Add(_btnRefreshWins); x += 120;
+            toolbar.Controls.Add(_btnRefreshWins); x += 138;
 
             // ── 根布局双模容器 (TabControl) ──────────────────────────
-            var mainTabs = new TabControl { Dock = DockStyle.Fill, Font = new Font("Microsoft YaHei", 9f) };
+            var mainTabs = new TabControl { Dock = DockStyle.Fill, Font = F_BODY };
             Controls.Add(mainTabs);
 
             var tabAssistant = new TabPage("执行助手") { BackColor = C_BG };
@@ -230,7 +230,7 @@ namespace GnwayController
                 Dock = DockStyle.Fill, RowHeadersVisible = false, AllowUserToAddRows = false,
                 AllowUserToDeleteRows = false, AllowUserToResizeRows = false, MultiSelect = false,
                 SelectionMode = DataGridViewSelectionMode.FullRowSelect, BackgroundColor = C_CARD,
-                BorderStyle = BorderStyle.FixedSingle, ReadOnly = true, Font = F_SMALL, RowTemplate = { Height = 28 }
+                BorderStyle = BorderStyle.FixedSingle, ReadOnly = true, Font = F_SMALL, RowTemplate = { Height = 30 }
             };
             _dgvWindows.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "窗口名称", Name = "colWinName", AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill });
             _dgvWindows.SelectionChanged += OnWindowSelectionChanged;
@@ -264,10 +264,10 @@ namespace GnwayController
                 RowHeadersVisible = false, AllowUserToAddRows = false, AllowUserToDeleteRows = false,
                 AllowUserToResizeRows = false, AllowUserToResizeColumns = true,
                 MultiSelect = false, SelectionMode = DataGridViewSelectionMode.CellSelect,
-                AutoSizeRowsMode = DataGridViewAutoSizeRowsMode.None, RowTemplate = { Height = 25 },
+                AutoSizeRowsMode = DataGridViewAutoSizeRowsMode.None, RowTemplate = { Height = 30 },
                 BackgroundColor = C_CARD, BorderStyle = BorderStyle.FixedSingle, GridColor = Color.FromArgb(240, 240, 240), Font = F_SMALL,
                 ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.DisableResizing,
-                ColumnHeadersHeight = 25, EditMode = DataGridViewEditMode.EditOnEnter,
+                ColumnHeadersHeight = 30, EditMode = DataGridViewEditMode.EditOnEnter,
                 AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None,
                 ScrollBars = ScrollBars.Both,
                 ClipboardCopyMode = DataGridViewClipboardCopyMode.EnableWithoutHeaderText
@@ -349,21 +349,21 @@ namespace GnwayController
         private void BuildEventsGrid(Control panel)
         {
             // 按钮条
-            var btnBar = new Panel { Dock = DockStyle.Top, Height = 32, BackColor = C_CARD };
+            var btnBar = new Panel { Dock = DockStyle.Top, Height = 36, BackColor = C_CARD };
             panel.Controls.Add(btnBar);
             int bx = 4;
-            _btnEvtTest = Btn("▶ 测试", btnBar, new Point(bx, 4), 70, C_ACCENT, Color.White); bx += 76;
+            _btnEvtTest = Btn("▶ 测试", btnBar, new Point(bx, 4), 78, C_ACCENT, Color.White); bx += 84;
             _btnEvtTest.Click += OnEvtTest;
-            var btnEvtEdit = Btn("✎ 编辑", btnBar, new Point(bx, 4), 62, C_OK, Color.White); bx += 68;
+            var btnEvtEdit = Btn("✎ 编辑", btnBar, new Point(bx, 4), 70, C_OK, Color.White); bx += 76;
             btnEvtEdit.Click += OnEvtEdit;
             _btnEvtUp   = Btn("↑", btnBar, new Point(bx, 4), 30, C_BG, C_TEXT); bx += 36;
             _btnEvtUp.Click += (_, __) => MoveEvt(-1);
             _btnEvtDown = Btn("↓", btnBar, new Point(bx, 4), 30, C_BG, C_TEXT); bx += 36;
             _btnEvtDown.Click += (_, __) => MoveEvt(+1);
-            _btnEvtDel  = Btn("🗑 删除", btnBar, new Point(bx, 4), 64, Color.FromArgb(220, 53, 69), Color.White);
-            _btnEvtDel.Click += OnEvtDelete; bx += 70;
+            _btnEvtDel  = Btn("🗑 删除", btnBar, new Point(bx, 4), 74, Color.FromArgb(220, 53, 69), Color.White);
+            _btnEvtDel.Click += OnEvtDelete; bx += 80;
             
-            var btnEvtManual = Btn("✍ 手动添加(已知名称)", btnBar, new Point(bx, 4), 130, Color.FromArgb(100, 116, 139), Color.White);
+            var btnEvtManual = Btn("✍ 手动添加(已知名称)", btnBar, new Point(bx, 4), 158, Color.FromArgb(100, 116, 139), Color.White);
             btnEvtManual.Click += OnEvtAddManual;
 
             // 事件列表
@@ -371,12 +371,13 @@ namespace GnwayController
                 Dock = DockStyle.Fill, View = View.Details,
                 FullRowSelect = true, GridLines = false,
                 BackColor = C_CARD, BorderStyle = BorderStyle.FixedSingle,
-                Font = F_SMALL, HeaderStyle = ColumnHeaderStyle.Nonclickable
+                Font = F_BODY, HeaderStyle = ColumnHeaderStyle.Nonclickable
             };
-            _lvEvents.Columns.Add("#",    28);
-            _lvEvents.Columns.Add("名称", 140);
-            _lvEvents.Columns.Add("窗口", 200);
-            _lvEvents.Columns.Add("动作", 250);
+            _lvEvents.SmallImageList = new ImageList { ImageSize = new Size(1, 30) };
+            _lvEvents.Columns.Add("#",    42);
+            _lvEvents.Columns.Add("名称", 170);
+            _lvEvents.Columns.Add("窗口", 260);
+            _lvEvents.Columns.Add("动作", 300);
             _lvEvents.KeyDown += OnListViewCopy;
             panel.Controls.Add(_lvEvents);
             _lvEvents.BringToFront();
@@ -400,32 +401,33 @@ private void BuildFlowPanel(Control panel)
             // ── 上半：流程步骤列表 ────────────────────────────
             SectionHeader("流程步骤", _innerSplit.Panel1, DockStyle.Top);
 
-            var stepBtnBar = new Panel { Dock = DockStyle.Top, Height = 32, BackColor = C_CARD };
+            var stepBtnBar = new Panel { Dock = DockStyle.Top, Height = 36, BackColor = C_CARD };
             _innerSplit.Panel1.Controls.Add(stepBtnBar);
             int sx = 4;
-            _btnStepAdd = Btn("+ 添加选中", stepBtnBar, new Point(sx, 4), 90, C_ACCENT, Color.White); sx += 96;
+            _btnStepAdd = Btn("+ 添加选中", stepBtnBar, new Point(sx, 4), 106, C_ACCENT, Color.White); sx += 112;
             _btnStepAdd.Click += OnStepAdd;
-            _btnStepRm  = Btn("− 移除", stepBtnBar, new Point(sx, 4), 60, C_BG, C_TEXT); sx += 66;
+            _btnStepRm  = Btn("− 移除", stepBtnBar, new Point(sx, 4), 70, C_BG, C_TEXT); sx += 76;
             _btnStepRm.Click  += OnStepRemove;
             _btnStepUp  = Btn("↑", stepBtnBar, new Point(sx, 4), 28, C_BG, C_TEXT); sx += 34;
             _btnStepUp.Click  += (_, __) => MoveStep(-1);
             _btnStepDn  = Btn("↓", stepBtnBar, new Point(sx, 4), 28, C_BG, C_TEXT); sx += 34;
             _btnStepDn.Click  += (_, __) => MoveStep(+1);
             
-            var btnImport = Btn("📂 导入", stepBtnBar, new Point(sx, 4), 60, C_BG, C_TEXT); sx += 66;
+            var btnImport = Btn("📂 导入", stepBtnBar, new Point(sx, 4), 72, C_BG, C_TEXT); sx += 78;
             btnImport.Click += OnFlowImport;
-            var btnExport = Btn("💾 导出", stepBtnBar, new Point(sx, 4), 60, C_BG, C_TEXT);
+            var btnExport = Btn("💾 导出", stepBtnBar, new Point(sx, 4), 72, C_BG, C_TEXT);
             btnExport.Click += OnFlowExport;
 
             _lvSteps = new ListView {
                 Dock = DockStyle.Fill, View = View.Details,
                 FullRowSelect = true, GridLines = false,
                 BackColor = C_CARD, BorderStyle = BorderStyle.FixedSingle,
-                Font = F_SMALL, HeaderStyle = ColumnHeaderStyle.Nonclickable
+                Font = F_BODY, HeaderStyle = ColumnHeaderStyle.Nonclickable
             };
-            _lvSteps.Columns.Add("步",   28);
-            _lvSteps.Columns.Add("事件名", 140);
-            _lvSteps.Columns.Add("窗口",   200);
+            _lvSteps.SmallImageList = new ImageList { ImageSize = new Size(1, 30) };
+            _lvSteps.Columns.Add("步",   46);
+            _lvSteps.Columns.Add("事件名", 180);
+            _lvSteps.Columns.Add("窗口",   280);
             _lvSteps.KeyDown += OnListViewCopy;
             _innerSplit.Panel1.Controls.Add(_lvSteps);
             _lvSteps.BringToFront(); // [!!! FIX MANGLED RIGHT-BOTTOM-LEFT PANEL (FLOW STEPS) OVERLAP !!!]
@@ -433,7 +435,7 @@ private void BuildFlowPanel(Control panel)
             // ── 下半：执行控制 + 日志 ─────────────────────────
             SectionHeader("执行控制 & 日志", _innerSplit.Panel2, DockStyle.Top);
 
-            var execBar = new Panel { Dock = DockStyle.Top, Height = 40, BackColor = C_CARD };
+            var execBar = new Panel { Dock = DockStyle.Top, Height = 44, BackColor = C_CARD };
             _innerSplit.Panel2.Controls.Add(execBar);
 
             execBar.Controls.Add(Lbl("从第", execBar, new Point(10, 10)));
@@ -453,12 +455,12 @@ private void BuildFlowPanel(Control panel)
             execBar.Controls.Add(Lbl("秒", execBar, new Point(230, 10)));
 
             int ex = 260;
-            _btnStart = Btn("▶ 启动", execBar, new Point(ex, 5), 74, Color.FromArgb(22, 101, 52), Color.White); ex += 84;
+            _btnStart = Btn("▶ 启动", execBar, new Point(ex, 5), 84, Color.FromArgb(22, 101, 52), Color.White); ex += 94;
             _btnStart.Click += OnStart;
-            _btnPause = Btn("⏸ 暂停", execBar, new Point(ex, 5), 74, C_BG, C_TEXT); ex += 84;
+            _btnPause = Btn("⏸ 暂停", execBar, new Point(ex, 5), 84, C_BG, C_TEXT); ex += 94;
             _btnPause.Enabled = false;
             _btnPause.Click   += OnPause;
-            _btnStop  = Btn("⏹ 停止", execBar, new Point(ex, 5), 74, C_BG, C_TEXT);
+            _btnStop  = Btn("⏹ 停止", execBar, new Point(ex, 5), 84, C_BG, C_TEXT);
             _btnStop.Enabled = false;
             _btnStop.Click   += OnStop;
 
@@ -1220,7 +1222,7 @@ private void BuildFlowPanel(Control panel)
                                    int w, Color bg, Color fg)
         {
             var b = new Button {
-                Text = text, Location = loc, Width = w, Height = 24,
+                Text = text, Location = loc, Width = w, Height = 28,
                 FlatStyle = FlatStyle.Flat, BackColor = bg, ForeColor = fg, Font = F_SMALL
             };
             b.FlatAppearance.BorderSize = 0;
@@ -1231,7 +1233,7 @@ private void BuildFlowPanel(Control panel)
 
         private static Panel SectionHeader(string title, Control parent, DockStyle dock)
         {
-            var hdr = new Panel { Dock = dock, Height = 32, BackColor = Color.FromArgb(246, 248, 252) };
+            var hdr = new Panel { Dock = dock, Height = 34, BackColor = Color.FromArgb(246, 248, 252) };
             hdr.Paint += (s, e) => e.Graphics.DrawLine(new Pen(C_BORDER), 0, hdr.Height - 1, hdr.Width, hdr.Height - 1);
             var lbl = new Label {
                 Text = title, Dock = DockStyle.Fill,

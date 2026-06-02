@@ -15,9 +15,9 @@ namespace GnwayController
 {
     public class GridNextDialog : Form
     {
-        static readonly Font F_BODY  = new Font("Segoe UI",  9.5f);
-        static readonly Font F_SMALL = new Font("Segoe UI",  8.5f);
-        static readonly Font F_MONO  = new Font("Consolas",  8.5f);
+        static readonly Font F_BODY  = new Font("Microsoft YaHei UI", 10.5f);
+        static readonly Font F_SMALL = new Font("Microsoft YaHei UI", 9.5f);
+        static readonly Font F_MONO  = new Font("Consolas",  9.5f);
 
         private readonly AgentClient _client;
         private readonly string      _windowName;
@@ -60,28 +60,28 @@ namespace GnwayController
             Controls.Add(lblInfo);
 
             // ── 设置区 ────────────────────────────────────────
-            var setupPanel = new Panel { Dock = DockStyle.Top, Height = 42, BackColor = Color.White };
+            var setupPanel = new Panel { Dock = DockStyle.Top, Height = 46, BackColor = Color.White };
             Controls.Add(setupPanel);
 
             setupPanel.Controls.Add(new Label {
-                Text = "匹配文字：", Location = new Point(10, 12), AutoSize = true, Font = F_SMALL
+                Text = "匹配文字：", Location = new Point(10, 14), AutoSize = true, Font = F_SMALL
             });
             _tbMatch = new TextBox {
-                Text = "待处理", Location = new Point(76, 8), Width = 120, Font = F_BODY
+                Text = "待处理", Location = new Point(82, 9), Width = 130, Font = F_BODY
             };
             setupPanel.Controls.Add(_tbMatch);
 
             setupPanel.Controls.Add(new Label {
-                Text = "检查第几列（0起）：", Location = new Point(210, 12), AutoSize = true, Font = F_SMALL
+                Text = "检查第几列（0起）：", Location = new Point(224, 14), AutoSize = true, Font = F_SMALL
             });
             _nudCol = new NumericUpDown {
                 Minimum = 0, Maximum = 30, Value = 0,
-                Location = new Point(330, 8), Width = 60, Font = F_BODY
+                Location = new Point(354, 9), Width = 64, Font = F_BODY
             };
             setupPanel.Controls.Add(_nudCol);
 
             _btnTest = new Button {
-                Text = "▶ 加载并测试", Location = new Point(408, 8), Width = 110, Height = 26,
+                Text = "▶ 加载并测试", Location = new Point(438, 8), Width = 122, Height = 30,
                 FlatStyle = FlatStyle.Flat, BackColor = Color.FromArgb(37, 99, 185),
                 ForeColor = Color.White, Font = F_SMALL
             };
@@ -102,17 +102,18 @@ namespace GnwayController
                 GridColor = Color.FromArgb(220, 228, 240),
                 Font = F_MONO,
                 AllowUserToResizeRows = false,
-                RowTemplate = { Height = 24 }
+                RowTemplate = { Height = 30 }
             };
             _dgvRows.ColumnHeadersDefaultCellStyle.Font = F_SMALL;
+            _dgvRows.ColumnHeadersHeight = 30;
             Controls.Add(_dgvRows);
 
             // ── 底部 ──────────────────────────────────────────
-            var bottom = new Panel { Dock = DockStyle.Bottom, Height = 44, BackColor = Color.White };
+            var bottom = new Panel { Dock = DockStyle.Bottom, Height = 48, BackColor = Color.White };
             Controls.Add(bottom);
 
             _lblRes = new Label {
-                Location = new Point(10, 14), AutoSize = true,
+                Location = new Point(10, 16), AutoSize = true,
                 Font = F_SMALL, ForeColor = Color.FromArgb(37, 99, 185),
                 BackColor = Color.Transparent
             };
@@ -120,7 +121,7 @@ namespace GnwayController
 
             var btnOk = new Button {
                 Text = "✓ 确认录制", DialogResult = DialogResult.OK,
-                Location = new Point(460, 10), Width = 100, Height = 26,
+                Location = new Point(450, 9), Width = 108, Height = 30,
                 FlatStyle = FlatStyle.Flat,
                 BackColor = Color.FromArgb(22, 101, 52), ForeColor = Color.White, Font = F_SMALL
             };
@@ -130,7 +131,7 @@ namespace GnwayController
 
             var btnCn = new Button {
                 Text = "取消", DialogResult = DialogResult.Cancel,
-                Location = new Point(568, 10), Width = 72, Height = 26,
+                Location = new Point(568, 9), Width = 78, Height = 30,
                 FlatStyle = FlatStyle.Flat, BackColor = Color.FromArgb(240, 240, 240),
                 Font = F_SMALL
             };
