@@ -40,6 +40,7 @@ namespace GnwayController.Engine
         private int           _lastGridStepIndex = -1;
         private AutoEvent?    _lastGridEvent;
         private EventAction?  _lastGridAction;
+        private bool          _unreadableGridAdvanceArmed;
 
         public bool IsRunning => _running;
         public bool IsPaused  => _paused;
@@ -151,6 +152,13 @@ namespace GnwayController.Engine
                     }
 
                     current = (current + 1) % count;
+                    if (_unreadableGridAdvanceArmed &&
+                        _lastGridStepIndex >= 0 &&
+                        current == _lastGridStepIndex)
+                    {
+                        _unreadableGridAdvanceArmed = false;
+                        AdvanceUnreadableGridRow("上一轮流程已完成且表格不可读取");
+                    }
                 }
 
                 if (_running)
@@ -474,16 +482,19 @@ namespace GnwayController.Engine
                 if (lines.Length > 0 && rowPreview.All(IsGridContainerPreview))
                 {
                     Log($"  ⚠ 表格只暴露容器名；本轮按当前选中行继续，不再尝试读取状态", LogLevel.Warn);
+                    _unreadableGridAdvanceArmed = true;
                     return false;
                 }
                 if (lines.Length == 0)
                 {
                     Log($"  ⚠ 表格未暴露可读取行，暂按当前选中行继续执行，不判定完成", LogLevel.Warn);
+                    _unreadableGridAdvanceArmed = true;
                     return false;
                 }
                 if (lines.Length > 0 && readableRows == 0)
                 {
                     Log($"  ⚠ 表格行存在但内容为空，暂不判定完成；请等待下一轮或检查表格读取", LogLevel.Warn);
+                    _unreadableGridAdvanceArmed = true;
                     return false;
                 }
                 Log($"  ✅ 表格中已无「{a.MatchText}」行，全部处理完成", LogLevel.Ok);

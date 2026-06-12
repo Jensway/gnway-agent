@@ -807,7 +807,10 @@ namespace GnwayAgent
             }
             if (rowIdx == 0)
             {
-                return DoMsaaGridRows(grid, maxRows);
+                string msaaRows = DoMsaaGridRows(grid, maxRows);
+                if (msaaRows != "OK:") return msaaRows;
+                if (IsSpreadSheetControl(grid)) return DoSpreadGridRows(grid);
+                return msaaRows;
             }
             return sb.ToString().TrimEnd();
         }
@@ -875,7 +878,91 @@ namespace GnwayAgent
                 child = walker.GetNextSibling(child);
             }
 
+            if (IsSpreadSheetControl(grid))
+                return DoSpreadGridSelect(grid, rowIndex);
+
             return DoMsaaGridSelect(grid, rowIndex);
+        }
+
+        static bool IsSpreadSheetControl(IntPtr hWnd)
+            => GetClassNameStr(hWnd).Equals("SPR32X30_SpreadSheet", StringComparison.OrdinalIgnoreCase);
+
+        static string DoSpreadGridRows(IntPtr grid)
+        {
+            // FarPoint Spread 3.x in this VB6/K3 screen does not expose COM/UIA/MSAA row text.
+            // Return an empty successful result so gridnext retries later instead of treating
+            // fabricated rows as proof that all matching business rows are done.
+            return "OK:";
+        }
+
+        static string DoSpreadGridSelect(IntPtr grid, int rowIndex)
+        {
+            GetWindowRect(grid, out RECT rect);
+            int width = rect.Right - rect.Left;
+            int height = rect.Bottom - rect.Top;
+            if (width <= 0 || height <= 0 || rowIndex < 0) return "ERR:row_out_of_bounds";
+
+            int visibleRows = TryReadSpreadSmallInt(grid, 0x1CC);
+            if (visibleRows <= 0 || visibleRows > 200) visibleRows = 5;
+
+            int header = Math.Min(24, Math.Max(18, height / 6));
+            int bodyHeight = Math.Max(1, height - header);
+            int rowHeight = Math.Max(14, bodyHeight / Math.Max(1, visibleRows));
+            int y = rect.Top + header + rowIndex * rowHeight + rowHeight / 2;
+            if (y >= rect.Bottom) return "ERR:row_out_of_visible_bounds";
+
+            int verticalScrollWidth = FindChildScrollBarWidth(grid, vertical: true);
+            int usableWidth = Math.Max(20, width - verticalScrollWidth);
+            int x = rect.Left + Math.Min(Math.Max(10, usableWidth / 6), usableWidth - 4);
+
+            ShowClickHighlight(new System.Drawing.Rectangle(rect.Left, Math.Max(rect.Top, y - rowHeight / 2), usableWidth, rowHeight));
+            System.Windows.Forms.Cursor.Position = new System.Drawing.Point(x, y);
+            Thread.Sleep(60);
+            mouse_event(MOUSEEVENTF_LEFTDOWN, x, y, 0, 0);
+            Thread.Sleep(50);
+            mouse_event(MOUSEEVENTF_LEFTUP, x, y, 0, 0);
+            Thread.Sleep(120);
+            return $"OK:spread_estimated_selected_row_{rowIndex}";
+        }
+
+        static int FindChildScrollBarWidth(IntPtr parent, bool vertical)
+        {
+            IntPtr child = GetWindow(parent, GW_CHILD);
+            while (child != IntPtr.Zero)
+            {
+                if (GetClassNameStr(child).Equals("ScrollBar", StringComparison.OrdinalIgnoreCase) &&
+                    GetWindowRect(child, out RECT r))
+                {
+                    int w = r.Right - r.Left;
+                    int h = r.Bottom - r.Top;
+                    if (vertical && h > w) return Math.Max(0, w);
+                    if (!vertical && w > h) return Math.Max(0, h);
+                }
+                child = GetWindow(child, GW_HWNDNEXT);
+            }
+            return 0;
+        }
+
+        static int TryReadSpreadSmallInt(IntPtr grid, int offset)
+        {
+            try
+            {
+                IntPtr obj = GetWindowLongPtrCompat(grid, 0);
+                if (obj == IntPtr.Zero) return 0;
+
+                GetWindowThreadProcessId(grid, out int pid);
+                IntPtr hProcess = OpenProcess(PROCESS_VM_READ, false, pid);
+                if (hProcess == IntPtr.Zero) return 0;
+                try
+                {
+                    if (ReadProcessMemory(hProcess, IntPtr.Add(obj, offset), out int value, 4, out IntPtr read) &&
+                        read.ToInt64() == 4)
+                        return value;
+                }
+                finally { CloseHandle(hProcess); }
+            }
+            catch { }
+            return 0;
         }
 
         class MsaaGridCell
@@ -1371,6 +1458,10 @@ namespace GnwayAgent
         [DllImport("user32.dll")] static extern void mouse_event(uint dwFlags, int dx, int dy, uint dwData, int dwExtraInfo);
         [DllImport("user32.dll")] static extern IntPtr GetParent(IntPtr hWnd);
         [DllImport("user32.dll")] static extern int GetWindowLong(IntPtr hWnd, int nIndex);
+        [DllImport("user32.dll", EntryPoint = "GetWindowLong")]
+        static extern IntPtr GetWindowLongPtr32(IntPtr hWnd, int nIndex);
+        [DllImport("user32.dll", EntryPoint = "GetWindowLongPtr")]
+        static extern IntPtr GetWindowLongPtr64(IntPtr hWnd, int nIndex);
         [DllImport("user32.dll")] [return: MarshalAs(UnmanagedType.Bool)] static extern bool SetForegroundWindow(IntPtr hWnd);
         [DllImport("user32.dll")] static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
         [DllImport("user32.dll")] static extern IntPtr GetForegroundWindow();
@@ -1441,6 +1532,8 @@ namespace GnwayAgent
         static extern bool VirtualFreeEx(IntPtr hProcess, IntPtr lpAddress, uint dwSize, uint dwFreeType);
         [DllImport("kernel32.dll", SetLastError = true)]
         static extern bool ReadProcessMemory(IntPtr hProcess, IntPtr lpBaseAddress, out RECT lpBuffer, uint nSize, out IntPtr lpNumberOfBytesRead);
+        [DllImport("kernel32.dll", SetLastError = true)]
+        static extern bool ReadProcessMemory(IntPtr hProcess, IntPtr lpBaseAddress, out int lpBuffer, uint nSize, out IntPtr lpNumberOfBytesRead);
         [DllImport("user32.dll", SetLastError = true)]
         static extern uint GetWindowThreadProcessId(IntPtr hWnd, out int processId);
         [DllImport("kernel32.dll", SetLastError = true)]
@@ -1483,6 +1576,9 @@ namespace GnwayAgent
         static extern int AccessibleChildren([MarshalAs(UnmanagedType.Interface)] object paccContainer, int iChildStart, int cChildren, [Out] object[] rgvarChildren, out int pcObtained);
 
         struct RECT { public int Left, Top, Right, Bottom; }
+
+        static IntPtr GetWindowLongPtrCompat(IntPtr hWnd, int nIndex)
+            => IntPtr.Size == 8 ? GetWindowLongPtr64(hWnd, nIndex) : GetWindowLongPtr32(hWnd, nIndex);
 
         static string GetWindowTextStr(IntPtr hWnd)
         {
